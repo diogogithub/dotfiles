@@ -390,15 +390,16 @@ mode $mode_system {
     bindsym Return mode "default"
     bindsym Escape mode "default"
 }
-bindsym $mod+Pause mode $mode_system
+#bindsym $mod+Pause mode $mode_system
+bindsym $mod+Home mode $mode_system
 #bindsym XF86Sleep  exec --no-startup-id ~/.config/i3/scripts/exit_menu.sh suspend, mode "default"
 
 ############################
 ######## KEYBOARD ##########
 ############################
-exec --no-startup-id xmodmap /home/xellos/.Xmodmap &
+#exec --no-startup-id xmodmap /home/xellos/.Xmodmap &
 
-bindsym mod3+Tab exec --no-startup-id xdotool key Caps_Lock
+#bindsym mod3+Tab exec --no-startup-id xdotool key Caps_Lock
 
 bindsym mod3+Escape exec --no-startup-id ~/.config/i3/scripts/exit_menu.sh poweroff
 
@@ -412,13 +413,13 @@ exec --no-startup-id nm-applet &
 exec --no-startup-id package-update-indicator &
 exec --no-startup-id xfsettingsd --sm-client-disable &
 exec --no-startup-id xfce4-power-manager &
-#exec --no-startup-id compton &
+exec --no-startup-id picom &
 exec --no-startup-id light-locker &
 exec --no-startup-id nitrogen --restore &
 
 #-> Session AutoStart
 exec --no-startup-id ~/.config/i3/scripts/autostart.sh
-#exec --no-startup-id parcellite &
+exec --no-startup-id parcellite &
 #exec --no-startup-id blueman-applet &
 #exec --no-startup-id redshift-gtk &
 #exec --no-startup-id indicator-kdeconnect &

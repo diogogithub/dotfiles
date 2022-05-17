@@ -10,6 +10,7 @@
 	ctags = !.git/hooks/ctags
 [init]
 	templatedir = ~/.git_template
+	defaultBranch = master
 [log]
 	decorate = short
 [color]
