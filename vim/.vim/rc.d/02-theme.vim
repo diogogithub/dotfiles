@@ -63,8 +63,8 @@ endif
 
 highlight Pmenu guibg=white guifg=black gui=bold
 highlight Comment gui=bold
-highlight Normal gui=none
-highlight NonText guibg=none
+highlight Normal gui=NONE
+highlight NonText guibg=NONE
 
 " Transparent Background (For i3 and compton)
 highlight Normal guibg=NONE ctermbg=NONE

@@ -26,7 +26,7 @@ setopt PROMPT_SUBST           # expand prompt sequences
 #
 WORDCHARS="${WORDCHARS:s#/#}"
 WORDCHARS="${WORDCHARS:s#.#}"
-export EDITOR=$(which nvim)
+export EDITOR=$(which vim)
 ##############################################################
 #key binding stuff to get the right keys to work
 # key bindings

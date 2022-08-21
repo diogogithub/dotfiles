@@ -1,3 +1,4 @@
+alias nvim='vim'
 # Pretty csv viewer
 function pretty_csv {
         column -t -s, -n "$@" | less -F -S -X -K

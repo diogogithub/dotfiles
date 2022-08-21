@@ -64,8 +64,6 @@ Plug 'yangmillstheory/vim-snipe' " replace f F t T to target easily the motion
 
 " undo tree
 Plug 'simnalamburt/vim-mundo'
-" registers
-Plug 'bfredl/nvim-miniyank'
 " close the current buffer
 Plug 'moll/vim-bbye'
 

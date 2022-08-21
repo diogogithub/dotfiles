@@ -2,6 +2,7 @@
 ########################
 .idea/
 .php_cs.cache
+.vscode
 
 # Compiled source #
 ###################

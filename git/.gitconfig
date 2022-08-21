@@ -2,7 +2,7 @@
 	name = Diogo Peralta Cordeiro
 	email = mail@diogo.site
 [core]
-	editor = nvim
+	editor = vim
 	excludesfile = ~/.gitignore_global
 [credential]
 	helper = cache --timeout=3600
@@ -36,9 +36,9 @@
 [url "https://aur.archlinux.org/"]
 	insteadOf = "aur:"
 [merge]
-	tool = nvim
-[mergetool "nvim"]
-	cmd = nvim -f -c \"Gdiff\" \"$MERGED\"
+	tool = vim
+[mergetool "vim"]
+	cmd = vim -f -c \"Gdiff\" \"$MERGED\"
 [rebase]
 	autosquash = true
 	instructionFormat = "(%an <%ae>) %s"

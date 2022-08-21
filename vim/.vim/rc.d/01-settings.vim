@@ -161,9 +161,6 @@ set display+=lastline
 set listchars=tab:>-,trail:-
 set list
 
-" Live substitution
-set inccommand=split
-
 if has("nvim")
   set laststatus=1
 endif
@@ -203,9 +200,6 @@ set foldlevelstart=0 " Start with all folds closed
 
 " Set foldtext
 set foldtext=general#FoldText()
-
-" Show the substitution LIVE
-set inccommand=nosplit
 
 " for vertical pane in git diff tool
 set diffopt+=vertical

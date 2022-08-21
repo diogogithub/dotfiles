@@ -1,33 +1,3 @@
-# There are 3 different types of shells in bash: the login shell, normal shell
-# and interactive shell. Login shells read ~/.profile and interactive shells
-# read ~/.bashrc; in our setup, /etc/profile sources ~/.bashrc - thus all
-# settings made here will also take effect in a login shell.
-#
-# NOTE: It is recommended to make language settings in ~/.profile rather than
-# here, since multilingual X sessions would not work properly if LANG is over-
-# ridden in every subshell.
-
-# Some applications read the EDITOR variable to determine your favourite text
-# editor.
-export EDITOR=$(which nvim)
-
-# set PATH so it includes user's private bin if it exists (as in GUI this will
-# not be an interactive login shell)
-if [ -d "$HOME/.local/bin" ]
-then
-	    PATH="$HOME/.local/bin:$PATH"
-fi
-
-# For some news readers it makes sense to specify the NEWSSERVER variable here
-#export NEWSSERVER=your.news.server
-
-# If you want to use a Palm device with Linux, uncomment the two lines below.
-# For some (older) Palm Pilots, you might need to set a lower baud rate
-# e.g. 57600 or 38400; lowest is 9600 (very slow!)
-#
-#export PILOTPORT=/dev/pilot
-#export PILOTRATE=115200
-
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
@@ -37,8 +7,6 @@ case $- in
     *i*) ;;
       *) return;;
 esac
-
-#[ -z "$PS1" ] && return
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -88,29 +56,8 @@ if [ -n "$force_color_prompt" ]; then
     fi
 fi
 
-# Make CTRL+S work
-stty -ixon
-
-# Workspace is the most frequent directory where I wanna be
-alias cd="HOME=~/workspace cd"
-
-cwdSlashAtEnd () {
-    TITLE="$(dirs +0)"
-
-    if [ -z "$1" ] ; then
-        # no argument, full cwd
-        TITLE="${TITLE%/}"
-    else
-        # one arg, basename only
-        TITLE="${TITLE##*/}"
-    fi
-
-    echo -n "${TITLE}/"
-}
-
 if [ "$color_prompt" = yes ]; then
-    #PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[$(printf "\x0f")\033[01;34m\]$(cwdSlashAtEnd)\[\033[00m\]$(__git_ps1 " (%s)")$ '
-    PS1='\[$(printf "\x0f")\033[01;34m\]$(cwdSlashAtEnd)\[\033[00m\]$(__git_ps1 " (%s)")$ '
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
 else
     PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi
@@ -118,12 +65,36 @@ unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
-xterm-*|rxvt*|screen*)
+xterm*|rxvt*)
     PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
     ;;
 *)
     ;;
 esac
+
+# enable color support of ls and also add handy aliases
+if [ -x /usr/bin/dircolors ]; then
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+    alias ls='ls --color=auto'
+    #alias dir='dir --color=auto'
+    #alias vdir='vdir --color=auto'
+
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
+
+# colored GCC warnings and errors
+#export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
+
+# some more ls aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+
+# Add an "alert" alias for long running commands.  Use like so:
+#   sleep 10; alert
+alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
 # Alias definitions.
 # You may want to put all your additions into a separate file like
@@ -144,14 +115,19 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-export PATH=$HOME/.cabal/bin:$PATH
 
-# VIM is my default text editor
-export EDITOR=$(which nvim)
-
-# {{START_NEOVIM_STUDIO_TOKEN}}
-if [ -z "${NEOVIM_STUDIO_PROFILE_SOURCED}" ] && [ -e "/home/xellos/.neovim-studio/neovim_studio_profile" ]; then
-    source "/home/xellos/.neovim-studio/neovim_studio_profile"
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/home/xellos/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/home/xellos/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "/home/xellos/anaconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/home/xellos/anaconda3/bin:$PATH"
+    fi
 fi
-# {{END_NEOVIM_STUDIO_TOKEN}}
+unset __conda_setup
+# <<< conda initialize <<<
 

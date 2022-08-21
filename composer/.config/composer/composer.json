@@ -2,9 +2,12 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "friendsofphp/php-cs-fixer": "^3.0",
-        "phpmd/phpmd": "^2.7",
-        "phpstan/phpstan": "^0.12.94",
-        "squizlabs/php_codesniffer": "^3.4"
+        "friendsofphp/php-cs-fixer": "*",
+        "squizlabs/php_codesniffer": "*",
+        "phpmd/phpmd": "*",
+        "kubawerlos/composer-json-fixer": "*",
+        "phpstan/phpstan": "*",
+        "vimeo/psalm": "*",
+        "psy/psysh": "@stable"
     }
 }

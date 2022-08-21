@@ -17,9 +17,11 @@
 *background: #191c26
 *foreground: #d0cec3
 *cursorColor: #fdc253
+Xft.autohint: 0
 Xft.antialias: 1
-Xft.hinting: 1
-Xft.hintstyle: hintfull
+Xft.hinting: true
+Xft.hintstyle: hintslight
 Xft.rgba: rgb
-Xcursor.theme: LHackneyed
-Xcursor.size: 32
+Xft.lcdfilter: lcddefault
+Xcursor.theme: Hackneyed (left-handed, scalable)
+Xft.dpi: 158

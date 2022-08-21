@@ -78,3 +78,19 @@ ZSH_THEME_GIT_PROMPT_CLEAN=""
 PROMPT='%{%f%k%b%}
 %{%B%F{green}%}%n%{%B%F{blue}%}@%{%B%F{cyan}%}%m%{%B%F{green}%} %{%b%F{yellow}%}%~%{%B%F{green}%}$(git_prompt_info)%E %{%}%{$fg_bold[red]%}%(?..%?)%{%f%b%}%{%f%k%b%}
 $(_prompt_char)%{%} %#%{%f%k%b%} '
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/home/xellos/anaconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
+else
+    if [ -f "/home/xellos/anaconda3/etc/profile.d/conda.sh" ]; then
+        . "/home/xellos/anaconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/home/xellos/anaconda3/bin:$PATH"
+    fi
+fi
+unset __conda_setup
+# <<< conda initialize <<<
+

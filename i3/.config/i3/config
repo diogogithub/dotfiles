@@ -322,7 +322,7 @@ bindsym $mod+r mode "resize"
 # Pulse Audio controls
 bindsym XF86AudioRaiseVolume exec --no-startup-id ~/.config/i3/scripts/volume_level.sh up #increase sound volume
 bindsym XF86AudioLowerVolume exec --no-startup-id ~/.config/i3/scripts/volume_level.sh down #decrease sound volume
-bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute 0 toggle # mute sound
+bindsym XF86AudioMute exec --no-startup-id ~/.config/i3/scripts/volume_level.sh toggle # mute sound
 bindsym $mod+o exec pavucontrol
 
 # Sreen brightness controls
@@ -342,7 +342,7 @@ bindsym XF86Sleep exec --no-startup-id ~/.config/i3/scripts/touchpad.sh
 ## Start Applications ##
 ########################
 
-bindsym $mod+Return exec i3-sensible-terminal
+bindsym $mod+Return exec kitty #i3-sensible-terminal
 bindsym $mod+F3 exec kitty -e 'ranger'
 bindsym Print exec xfce4-screenshooter
 bindsym $mod+Ctrl+x --release exec --no-startup-id xkill
@@ -363,8 +363,8 @@ bindsym Mod1+F2 exec --no-startup-id dmenu_run
 # start j4-dmenu-desktop which only displays applications
 # shipping a .desktop file. It is a wrapper around dmenu, so you need that
 # installed.
-bindsym $mod+d exec --no-startup-id i3-dmenu-desktop
-#bindsym $mod+d exec --no-startup-id j4-dmenu-desktop [--dmenu="dmenu -i"] [--term="i3-sensible-terminal"]
+#bindsym $mod+d exec --no-startup-id i3-dmenu-desktop
+bindsym $mod+d exec --no-startup-id j4-dmenu-desktop [--dmenu="dmenu -i"] [--term="i3-sensible-terminal"]
 
 # launch categorized menu
 bindsym $mod+z exec --no-startup-id ~/.config/i3/scripts/morc_menu.sh
@@ -408,8 +408,9 @@ bindsym mod3+Escape exec --no-startup-id ~/.config/i3/scripts/exit_menu.sh power
 ############################
 
 #-> System related
+exec --no-startup-id /usr/bin/fcitx5 &
 exec --no-startup-id nm-applet &
-#exec --no-startup-id /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
+exec --no-startup-id /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 &
 exec --no-startup-id package-update-indicator &
 exec --no-startup-id xfsettingsd --sm-client-disable &
 exec --no-startup-id xfce4-power-manager &
@@ -423,11 +424,17 @@ exec --no-startup-id parcellite &
 #exec --no-startup-id blueman-applet &
 #exec --no-startup-id redshift-gtk &
 #exec --no-startup-id indicator-kdeconnect &
-#exec --no-startup-id /usr/bin/nextcloud &
+exec --no-startup-id nextcloud &
 #exec --no-startup-id gajim &
 #exec --no-startup-id hexchat --minimize=2 &
-#exec --no-startup-id /opt/Telegram/Telegram -startintray &
+exec --no-startup-id Telegram -startintray &
 #exec --no-startup-id /opt/spotlight.sh &
+
+# DPI because XFCE hardcoded it
+## workstation
+# exec --no-startup-id "sleep 5; xrand --dpi 109 &"
+## laptop
+exec --no-startup-id "sleep 5; xrandr --dpi 158 &"
 
 # Display Mode
 bindsym $mod+p mode "$mode_display"

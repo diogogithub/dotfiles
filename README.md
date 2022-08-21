@@ -174,8 +174,9 @@ Proper network manager with VPN support
 * fonts-font-awesome
 * fonts-open-sans
 * fonts-paratype
+* fonts-noto
 
-`sudo aptitude install ttf-mscorefonts-installer ttf-dejavu fonts-hack-ttf fonts-font-awesome fonts-open-sans fonts-paratype`
+`sudo aptitude install ttf-mscorefonts-installer ttf-dejavu fonts-hack-ttf fonts-font-awesome fonts-open-sans fonts-paratype fonts-noto`
 
 #### Install Microsoft Tahoma, Segoe UI, and other fonts
 
