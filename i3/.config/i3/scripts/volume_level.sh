@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # Pulse Audio controls
 
 #sink=$(pacmd list-sinks | grep index | awk '{ print substr( $0, length($0), length($0) ) }')
