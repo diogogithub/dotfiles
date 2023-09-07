@@ -1,8 +1,13 @@
-app=ristretto
+app=gthumb
 last_user=
-screenshot_dir=file:/home/xellos/Pictures
+screenshot_dir=file:/home/xellos
 action=2
 delay=1
 region=3
 show_mouse=0
+last_extension=png
+enable_imgur_upload=true
+show_border=1
+custom_action_command=none
+show_in_folder=false
 
