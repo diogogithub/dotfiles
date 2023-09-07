@@ -45,7 +45,7 @@ kitty + complete setup zsh | source /dev/stdin
 
 # Theme: https://github.com/Stratus3D/dotfiles/blob/master/zsh/blinks-modified.zsh-theme
 
-# 
+#
 # https://github.com/blinks zsh theme
 
 # I have modified the blinks theme to make it more lightweight. There is no
@@ -94,3 +94,24 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
+# ROS 2
+source /opt/ros/humble/setup.zsh
+source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.zsh
+
+mp4() {
+  if [ "$2" == "" ]; then
+    out="${1%.*}".mp4
+  else
+    out="$2"
+  fi
+  ffmpeg -i "$1" -crf 28 -movflags +faststart -c:v libx264 "$out"
+}
+
+gif() {
+  if [ "$2" == "" ]; then
+    out="${1%.*}".gif
+  else
+    out="$2"
+  fi
+  ffmpeg -i "$1" -vf "scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" "$out"
+}

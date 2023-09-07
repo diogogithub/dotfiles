@@ -21,12 +21,12 @@ Applications
 **Desktop Environment**: XFCE
 **WM**: i3
 **LockScreen**: light-lock
-**Launcher**: Rofi
-**Browser**: Firefox
+**Launcher**: j4-dmenu-desktop
+**Browser**: firefox-esr
 **Development Environment**: Neovim
 **Document Viewer**: Atril
 **File Manager**: PCManFM
-**Music**: pragha
+**Music**: clementine
 **Video**: totem
 
 
@@ -43,11 +43,6 @@ Download the XFCE CD1 from: https://cdimage.debian.org/debian-cd/current/amd64/i
 
 ### Repositories Keys
 
-    wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | sudo apt-key add -
-    wget -q https://www.virtualbox.org/download/oracle_vbox.asc -O- | sudo apt-key add -
-    wget -O- https://jgeboski.github.io/obs.key | sudo apt-key add -
-    wget -O- http://apt.metasploit.com/metasploit-framework.gpg.key | sudo apt-key add -
-    sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 60EE47FBAD3DD469
     wget --quiet -O - https://insomnia.rest/keys/debian-public.key.asc | sudo apt-key add -
 
 
@@ -72,7 +67,7 @@ Select:
 ## SUDO
 
 ### Install sudo
-    aptitude install sudo gksu
+    aptitude install sudo
 
 ### Add Administrator to sudoers
     adduser {username} sudo
@@ -80,13 +75,7 @@ Select:
 ## Hardware
 
 ### Firmware
-    aptitude install firmware-linux intel-microcode amd64-microcode initramfs-tools firmware-amd-graphics
     aptitude install inotify-tools inotify-hookable sassc
-    dpkg --add-architecture i386
-
-### Wifi
-
-    aptitude install firmware-realtek firmware-iwlwifi
 
 ### Battery and Overheating
 
@@ -108,12 +97,6 @@ Select:
 * cpupower
 
 `sudo aptitude install lm-sensors hddtemp psensor`
-
-### Disable bluetooth auto power-on
-
-Blueman automatically enables Bluetooth adapter when certain events (on boot, laptop lid is opened, ...) occur. This can be disabled with the auto-power-on in org.blueman.plugins.powermanager:
-
-    sudo gsettings set org.blueman.plugins.powermanager auto-power-on false
 
 ### Network
 
@@ -137,10 +120,10 @@ Proper network manager with VPN support
 
 ### Storage
 
-* gnome-disks
+* gnome-disk-utility
 * gparted
 
-`sudo aptitude install gnome-disks gparted`
+`sudo aptitude install gnome-disk-utility gparted`
 
 ## Shell
 
@@ -183,10 +166,6 @@ Proper network manager with VPN support
     mkdir ~/.fonts
     wget -qO- http://plasmasturm.org/code/vistafonts-installer/vistafonts-installer | bash
 
-### Spotlight (unused)
-
-[Diogo's spotlight script](https://git.gnu.io/snippets/107)
-
 ### i3
 
 * [i3](https://blog.diogo.site/posts/i3wm)
@@ -228,9 +207,6 @@ Proper network manager with VPN support
 
 `sudo aptitude install pk-update-icon apt-config-auto-update`
 
-### Wine
-
-`sudo aptitude -t stretch-backports install wine`
 
 ## General Software
 
@@ -242,20 +218,19 @@ Proper network manager with VPN support
 * gimp
 * totem
 * handbrake
-* kdenlive
 * audacity
 * krita
 * blender
 * freecad
 * openscad
 
-`sudo aptitude install pavucontrol libavcodec-extra clementine gimp totem handbrake kdenlive audacity cmus`
+`sudo aptitude install pavucontrol libavcodec-extra clementine gimp totem handbrake audacity`
 
 ### Utilities
 
 * tmux
 * parcellite
-* qalculate
+* qalculate-gtk
 * gparted
 * simplescreenrecorder
 * kde-spectacle
@@ -266,25 +241,25 @@ Proper network manager with VPN support
 * redshift-gtk
 * seahorse
 
-`sudo aptitude install tmux parcellite qalculate gparted libreoffice simplescreenrecorder kde-spectacle gthumb engrampa arandr redshift-gtk seahorse`
+`sudo aptitude install tmux parcellite qalculate-gtk gthumb engrampa arandr seahorse`
 
 ### Programming
 
 * geany with [Darcula colorscheme](https://raw.githubusercontent.com/codebrainz/geany-themes/master/colorschemes/darcula.conf)
+* kate
 * git
 
-`sudo aptitude install geany git`
+`sudo aptitude install git geany kate`
 
 #### Neovim
 
 * `sudo aptitude purge vim-tiny`
 * `sudo aptitude install neovim`
 * `stow neovim tags-settings python javascript ruby`
-* `~/.config/nvim/installer/install.sh`
 
 ### Internet
 
-* `sudo aptitude install deluge firefox`
+* `sudo aptitude install qbittorrent`
 
 #### Chatting
 
