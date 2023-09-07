@@ -63,10 +63,10 @@ set tw=80
 " Turn persistent undo on means that you can undo
 " even when you close a buffer/VIM
 " ==================================================
-set directory=~/.nvim_runtime/temp_dirs/swap/
-set backupdir=~/.nvim_runtime/temp_dirs/backup/
+set directory=~/.vim_runtime/temp_dirs/swap/
+set backupdir=~/.vim_runtime/temp_dirs/backup/
 try
-  set undodir=~/.nvim_runtime/temp_dirs/undodir
+  set undodir=~/.vim_runtime/temp_dirs/undodir
   set undofile
 catch
 endtry

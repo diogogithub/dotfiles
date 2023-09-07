@@ -2,15 +2,10 @@
 " vim-plug  setup
 " ==================================================
 "
-call plug#begin('~/.local/share/nvim/plugged')
+call plug#begin('~/.local/share/vim/plugged')
 
 " Color schemes and appearance
-
-Plug 'frankier/neovim-colors-solarized-truecolor-only'
-Plug 'chriskempson/base16-vim'
-Plug 'drewtempelmeyer/palenight.vim'
-"Plug 'kaicataldo/material.vim'
-Plug 'dikiaap/minimalist'
+Plug 'folke/tokyonight.nvim'
 
 " Appearance
 Plug 'ryanoasis/vim-devicons'
@@ -19,57 +14,30 @@ Plug 'junegunn/limelight.vim'
 Plug 'junegunn/goyo.vim'
 Plug 'nathanaelkane/vim-indent-guides'
 Plug 'junegunn/vim-journal'
-Plug 'luochen1990/rainbow'
 Plug 'bling/vim-bufferline'
-
-" easy way to rezise and exchange windows
-Plug 'simeji/winresizer'
 
 
 " General utilities
-
+Plug 'simeji/winresizer' " easy way to rezise and exchange windows
 Plug 'ctrlpvim/ctrlp.vim'
-Plug 'farmergreg/vim-lastplace'
 Plug 'tpope/vim-sensible'
 Plug 'tpope/vim-surround'
 Plug 'scrooloose/nerdtree', { 'on': ['NERDTreeToggle', 'NERDTreeFind']}
 Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
 Plug 'jistr/vim-nerdtree-tabs'
 Plug 'ervandew/supertab'
-Plug 'vim-scripts/DrawIt'
-Plug 'terryma/vim-multiple-cursors'
 Plug 'machakann/vim-highlightedyank'
-Plug 'tpope/vim-repeat'
-Plug 'junegunn/vim-easy-align'
 Plug 'tpope/vim-abolish'
 Plug 'Yggdroot/indentLine'
 Plug 'chrisbra/Colorizer'
-Plug 'heavenshell/vim-pydocstring'
-Plug 'vim-scripts/loremipsum'
-Plug 'metakirby5/codi.vim'
-Plug 'dkarter/bullets.vim'
-Plug 'wesQ3/vim-windowswap'
-Plug 'benmills/vimux'
-Plug 'schickling/vim-bufonly'
-Plug 'shougo/echodoc.vim'
-Plug 'tpope/vim-sleuth'
-"Plug 'tpope/vim-unimpaired'
-Plug 'shougo/denite.nvim'
-Plug 'wincent/loupe'
-Plug 'jez/vim-superman' " Open man with vim using vman (need to be configured in zsh boot)
 Plug 'blueyed/vim-diminactive' " Plug to dim not-focused windows
 Plug 'lambdalisue/suda.vim' " Write file with sudo
 Plug 'junegunn/vim-peekaboo' " Display register values on " and @
-Plug 'yangmillstheory/vim-snipe' " replace f F t T to target easily the motion
-
-" undo tree
-Plug 'simnalamburt/vim-mundo'
-" close the current buffer
-Plug 'moll/vim-bbye'
+"Plug 'yangmillstheory/vim-snipe' " replace f F t T to target easily the motion
+Plug 'simnalamburt/vim-mundo' " undo tree
 
 
 " Version control support
-"
 Plug 'tpope/vim-fugitive'
 Plug 'mhinz/vim-signify'
 Plug 'Xuyuanp/nerdtree-git-plugin'
@@ -82,8 +50,6 @@ Plug 'majutsushi/tagbar'
 Plug 'liuchengxu/vista.vim'
 Plug 'editorconfig/editorconfig-vim'
 Plug 'vim-scripts/Shebang'
-Plug 'sirver/ultisnips'
-Plug 'honza/vim-snippets'
 Plug 'Valloric/MatchTagAlways'
 Plug 'amiorin/vim-project'
 Plug 'mhinz/vim-startify'
@@ -93,7 +59,6 @@ Plug 'AndrewRadev/splitjoin.vim' " Split arrays in PHP / struct in Go / other th
 Plug 'ludovicchabant/vim-gutentags'
 Plug 'skywind3000/gutentags_plus'
 Plug 'skywind3000/vim-preview'
-
 
 " fzf - poweful fuzzy finder
 " Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
@@ -113,8 +78,8 @@ Plug 'hail2u/vim-css3-syntax'
 Plug 'cakebaker/scss-syntax.vim'
 Plug 'vim-scripts/Fold-license'
 Plug 'neomake/neomake'
-Plug 'joonty/vdebug'
 Plug 'ap/vim-css-color' " display the hexadecimal colors - useful for css and color config
+Plug 'tpope/vim-sleuth'
 
 " Polyglot
 Plug 'sheerun/vim-polyglot'
@@ -158,9 +123,7 @@ Plug 'vim-scripts/svg.vim'
 Plug 'voldikss/vim-mma'
 Plug 'wgwoods/vim-systemd-syntax'
 Plug 'wlangstroth/vim-racket'
-
-" emmet for html
-Plug 'mattn/emmet-vim'
+Plug 'mattn/emmet-vim' " emmet for html
 
 " Markdown / Writting
 Plug 'reedes/vim-pencil'
@@ -217,7 +180,14 @@ Plug 'mxw/vim-jsx'
 " Smart Autocomplete
 Plug 'w0rp/ale'
 Plug 'kristijanhusak/deoplete-phpactor'
-Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
+if has('nvim')
+  Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
+else
+  Plug 'Shougo/deoplete.nvim'
+  Plug 'roxma/nvim-yarp'
+  Plug 'roxma/vim-hug-neovim-rpc'
+endif
+let g:deoplete#enable_at_startup = 1
 Plug 'zchee/deoplete-clang'
 Plug 'wokalski/autocomplete-flow'
 Plug 'sebastianmarkow/deoplete-rust'
@@ -228,6 +198,11 @@ Plug 'othree/csscomplete.vim'
 Plug 'othree/xml.vim'
 Plug 'c9s/perlomni.vim'
 Plug 'artur-shaik/vim-javacomplete2'
+
+" Snippets
+Plug 'SirVer/ultisnips'
+Plug 'honza/vim-snippets'
+let g:UltiSnipsSnippetDirectories=[$HOME.'/.vim/UltiSnips']
 
 call plug#end()
 

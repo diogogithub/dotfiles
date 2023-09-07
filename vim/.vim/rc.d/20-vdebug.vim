@@ -22,8 +22,5 @@ let g:vdebug_keymap = {
 let g:vdebug_options["path_maps"] = {
       \}
 
-" redefine the characters
-autocmd VimEnter * sign define breakpt text= texthl=DbgBreakptSign linehl=DbgBreakptLine
-autocmd VimEnter * sign define current text= texthl=DbgCurrentSign linehl=DbgCurrentLine
 
 " vim:set et sw=2:
