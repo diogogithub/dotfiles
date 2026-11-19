@@ -1,0 +1,34 @@
+#!/bin/dash
+set -eu
+repo=https://github.com/diogogithub/spotlight-wallpaper.git
+destination=${XDG_DATA_HOME:-"$HOME/.local/share"}/dotfiles/spotlight-wallpaper
+command -v git >/dev/null 2>&1 || { printf 'git is required\n' >&2; exit 1; }
+if [ -e "$destination" ] && [ ! -d "$destination/.git" ]; then
+    printf 'Existing directory is not a Git checkout: %s\n' "$destination" >&2
+    exit 1
+fi
+if [ -d "$destination/.git" ]; then
+    origin=$(git -C "$destination" remote get-url origin)
+    case $origin in
+        "$repo"|https://github.com/diogogithub/spotlight-wallpaper|git@github.com:diogogithub/spotlight-wallpaper.git) ;;
+        *) printf 'Unexpected Git origin: %s\n' "$origin" >&2; exit 1 ;;
+    esac
+    [ -z "$(git -C "$destination" status --porcelain)" ] || {
+        printf 'Spotlight checkout has local changes; resolve before updating.\n' >&2
+        exit 1
+    }
+    git -C "$destination" pull --ff-only
+else
+    mkdir -p "$(dirname "$destination")"
+    git clone --depth 1 "$repo" "$destination"
+fi
+[ -f "$destination/bin/spotlight-wallpaper" ] || {
+    printf 'The Spotlight client is missing in the checked-out repository.\n' >&2
+    exit 1
+}
+if command -v systemctl >/dev/null 2>&1 && [ -f "$HOME/.config/systemd/user/dotfiles-spotlight.timer" ]; then
+    systemctl --user daemon-reload
+    systemctl --user enable --now dotfiles-spotlight.timer
+    systemctl --user start --no-block dotfiles-spotlight.service || :
+fi
+printf 'Spotlight installed. Use the i3 session to view the wallpaper.\n'

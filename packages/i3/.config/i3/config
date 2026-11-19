@@ -42,6 +42,7 @@ bindsym $mod+Return exec --no-startup-id kitty
 bindsym $mod+Shift+f exec --no-startup-id firefox
 bindsym $mod+Shift+m exec --no-startup-id thunderbird
 bindsym $mod+Shift+t exec --no-startup-id thunar
+bindsym $mod+Shift+F5 exec --no-startup-id systemctl --user start --no-block dotfiles-spotlight.service
 bindsym $mod+o exec --no-startup-id pavucontrol
 bindsym $mod+z exec --no-startup-id $launcher
 bindsym Mod1+F2 exec --no-startup-id $launcher

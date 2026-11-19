@@ -135,6 +135,15 @@ jobs:
           grep -F 'focused_workspace $bar_focus $bar_focus' packages/i3/.config/i3/config
           ! grep -qi '#d64937' packages/i3/.config/i3/config
 
+      - name: Validate Spotlight wallpaper integration
+        run: |
+          dash -n scripts/install-spotlight-wallpaper packages/bin/.local/libexec/dotfiles/wallpaper-refresh
+          shellcheck -e SC1007 -s dash scripts/install-spotlight-wallpaper
+          shellcheck -e SC1007 -s dash packages/bin/.local/libexec/dotfiles/wallpaper-refresh
+          grep -Fx 'wallpaper' config/stow-profiles/i3-xfce
+          grep -Fx 'feh' config/packages/opensuse/i3-xfce.optional
+          grep -F 'OnUnitActiveSec=6h' packages/wallpaper/.config/systemd/user/dotfiles-spotlight.timer
+
       - name: Validate i3 config
         run: |
           test_home=$(mktemp -d)

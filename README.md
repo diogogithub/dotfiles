@@ -48,9 +48,25 @@ The i3bar shows XEmbed tray applications. Parcellite starts automatically, and N
 
 A named login entry can be installed locally. Host-specific migration scripts are intentionally not tracked.
 
-## i3 appearance
+## i3 colors and wallpaper
 
-Window borders use the original i3 greys (`#444444` focused, `#2f343f` inactive), rather than the default blue. The focused workspace is grey as well. GTK themes do not set i3 window colors.
+Window borders use the **original i3 greys** (`#444444` focused, `#2f343f` inactive), not i3's default blue or a bright Numix accent. The focused workspace is also grey. GTK themes do not automatically set i3 window colors.
+
+The `wallpaper` profile package adds a systemd user timer and wallpaper helper. The timer refreshes Microsoft Spotlight images roughly every six hours. The helper reads the current X11 resolution from `xrandr` (for instance, 3440×1440), asks Spotlight for those dimensions, and uses `feh --bg-fill` for aspect-correct cropping. Spotlight may still return 16:9 images. Failed downloads leave the previous cached wallpaper untouched.
+
+Once the `i3-xfce` profile has been applied:
+
+```sh
+sudo zypper install feh python3
+./apply --profile i3-xfce
+./scripts/install-spotlight-wallpaper
+```
+
+To update an existing Spotlight checkout after a downloader fix, re-run `./scripts/install-spotlight-wallpaper`. This performs a fast-forward update and re-triggers the service. The Spotlight v3 service can return no eligible images; if both Placement and Cache return no image, the last valid wallpaper is retained and the reason is written to the journal. The service does not silently switch to Bing.
+
+`Super+Shift+F5` requests an immediate refresh. Check failures with `journalctl --user -u dotfiles-spotlight.service -n 30`. To avoid cropping, set `DOTFILES_WALLPAPER_FIT=max` in the user environment; this may add borders.
+
+FreshSplash is a separate self-hosted community wallpaper source. It is not enabled without an actual FreshSplash server URL. The Spotlight client checkout and any user-specific server settings remain outside this repository.
 
 ## Backups and rollback
 

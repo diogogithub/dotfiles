@@ -1,0 +1,46 @@
+#!/bin/dash
+set -eu
+mode=${1:---apply}
+case $mode in --apply|--refresh) ;; *) printf 'Usage: wallpaper-refresh --apply|--refresh\n' >&2; exit 2 ;; esac
+[ "${XDG_SESSION_TYPE:-}" != wayland ] || exit 0
+[ -n "${DISPLAY:-}" ] || exit 0
+command -v i3-msg >/dev/null 2>&1 || exit 0
+i3-msg -t get_version >/dev/null 2>&1 || exit 0
+command -v feh >/dev/null 2>&1 || { printf 'feh is required for X11 wallpaper\n' >&2; exit 1; }
+wallpaper=${XDG_DATA_HOME:-"$HOME/.local/share"}/backgrounds/spotlight.jpg
+source_dir=${XDG_DATA_HOME:-"$HOME/.local/share"}/dotfiles/spotlight-wallpaper
+
+if [ "$mode" = --refresh ]; then
+    downloader=$source_dir/bin/spotlight-wallpaper
+    [ -f "$downloader" ] || { printf 'Install Spotlight first: ./scripts/install-spotlight-wallpaper\n' >&2; exit 1; }
+    width=1920
+    height=1080
+    if command -v xrandr >/dev/null 2>&1; then
+        resolution=$(xrandr --current 2>/dev/null | awk '
+            $2 == "connected" && $3 == "primary" { split($4, a, "+"); print a[1]; exit }
+        ')
+        if [ -z "$resolution" ]; then
+            resolution=$(xrandr --current 2>/dev/null | awk '/\*/ { print $1; exit }')
+        fi
+        case $resolution in
+            *x*)
+                w=${resolution%%x*}
+                h=${resolution#*x}
+                case $w:$h in
+                    *[!0-9:]*|:*|*:) ;;
+                    *) width=$w; height=$h ;;
+                esac ;;
+        esac
+    fi
+    python3 "$downloader" --output "$wallpaper" --width "$width" --height "$height" \
+        --min-width 1600 --min-height 900 || exit 1
+fi
+
+[ -s "$wallpaper" ] || exit 0
+case ${DOTFILES_WALLPAPER_FIT:-fill} in
+    fill) fit=--bg-fill ;;
+    max) fit=--bg-max ;;
+    scale) fit=--bg-scale ;;
+    *) printf 'Invalid DOTFILES_WALLPAPER_FIT\n' >&2; exit 2 ;;
+esac
+exec feh --no-fehbg "$fit" "$wallpaper"

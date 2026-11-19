@@ -1,0 +1,8 @@
+[Unit]
+Description=Refresh the i3 wallpaper from Microsoft Spotlight
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/libexec/dotfiles/wallpaper-refresh --refresh

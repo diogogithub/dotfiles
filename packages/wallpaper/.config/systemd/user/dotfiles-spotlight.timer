@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh the i3 Spotlight wallpaper periodically
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=6h
+RandomizedDelaySec=10min
+Unit=dotfiles-spotlight.service
+
+[Install]
+WantedBy=timers.target

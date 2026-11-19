@@ -28,3 +28,11 @@ command -v parcellite >/dev/null 2>&1 && start_once parcellite parcellite
 if command -v dex >/dev/null 2>&1; then
     dex --autostart --environment i3 --search-paths "$HOME/.config/autostart" >/dev/null 2>&1 &
 fi
+
+# Set the cached wallpaper immediately, then keep it updated by a user timer.
+if [ -x "$HOME/.local/libexec/dotfiles/wallpaper-refresh" ]; then
+    "$HOME/.local/libexec/dotfiles/wallpaper-refresh" --apply >/dev/null 2>&1 &
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user start dotfiles-spotlight.timer >/dev/null 2>&1 || :
+    fi
+fi
