@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Configure PCManFM/Thunar for Engrampa and Kitty, preserving other settings."""
+from __future__ import annotations
+
+import argparse
+import re
+import shutil
+import sys
+import time
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+
+def update_ini_section(contents: str, section: str, settings: dict[str, str]) -> str:
+    """Update selected INI keys without rewriting unrelated settings/comments."""
+    match = re.search(rf"(?m)^\[{re.escape(section)}\][ \t]*$", contents)
+    if match is None:
+        return contents.rstrip('\n') + f'\n\n[{section}]\n' + ''.join(f'{k}={v}\n' for k, v in settings.items())
+    next_section = re.search(r'(?m)^\[[^\]\r\n]+\][ \t]*$', contents[match.end():])
+    end = match.end() + next_section.start() if next_section else len(contents)
+    block = contents[match.start():end]
+    for key, value in settings.items():
+        pattern = re.compile(rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[^\r\n]*$')
+        if pattern.search(block):
+            block = pattern.sub(f'{key}={value}', block, count=1)
+        else:
+            block = block.rstrip('\n') + f'\n{key}={value}\n'
+    return contents[:match.start()] + block + contents[end:]
+
+
+def update_helpers(contents: str) -> str:
+    pattern = re.compile(r'(?m)^TerminalEmulator[ \t]*=[^\r\n]*$')
+    return (pattern.sub('TerminalEmulator=kitty', contents, count=1) if pattern.search(contents)
+            else contents.rstrip('\n') + '\nTerminalEmulator=kitty\n')
+
+
+def update_thunar_action(contents: str) -> tuple[str, str]:
+    if contents.strip():
+        parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+        root = ET.fromstring(contents, parser=parser)
+        if root.tag != 'actions':
+            raise ValueError('Unexpected Thunar/uca.xml root; will not modify')
+    else:
+        root = ET.Element('actions')
+    action = None
+    for entry in root.findall('action'):
+        command = entry.findtext('command', '')
+        name = entry.findtext('name', '').casefold()
+        if ('TerminalEmulator' in command or 'kitty --directory' in command
+                or ('terminal' in name and ('here' in name or 'aqui' in name))):
+            action = entry
+            break
+    if action is None:
+        action = ET.SubElement(root, 'action')
+        ET.SubElement(action, 'icon').text = 'utilities-terminal'
+        ET.SubElement(action, 'name').text = 'Open Kitty Here'
+        ET.SubElement(action, 'unique-id').text = f'{time.time_ns() // 1000}-1'
+        ET.SubElement(action, 'command').text = 'kitty --directory %f'
+        ET.SubElement(action, 'description').text = 'Open Kitty in this directory'
+        ET.SubElement(action, 'patterns').text = '*'
+        ET.SubElement(action, 'directories')
+    else:
+        command = action.find('command')
+        if command is None:
+            command = ET.SubElement(action, 'command')
+        command.text = 'kitty --directory %f'
+        if action.find('directories') is None:
+            ET.SubElement(action, 'directories')
+        if action.find('patterns') is None:
+            ET.SubElement(action, 'patterns').text = '*'
+    unique_id = action.findtext('unique-id', '')
+    if not unique_id:
+        unique_id = f'{time.time_ns() // 1000}-1'
+        ET.SubElement(action, 'unique-id').text = unique_id
+    ET.indent(root, space='  ')
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding='unicode') + '\n', unique_id
+
+
+def update_thunar_accels(contents: str, unique_id: str) -> str:
+    """Give F4 to the terminal action; preserve all other accelerators."""
+    target = f'<Actions>/ThunarActions/uca-action-{unique_id}'
+    entries = []
+    for line in contents.splitlines():
+        match = re.match(r'\s*\(gtk_accel_path\s+"([^"]+)"\s+"F4"\)\s*$', line)
+        if match:
+            # Backups retain bindings F4 previously had, including built-ins.
+            continue
+        # Remove an old accelerator for the action we are about to update.
+        if re.match(r'\s*\(gtk_accel_path\s+"' + re.escape(target) + r'"\s+"[^"]*"\)\s*$', line):
+            continue
+        entries.append(line)
+    entries.append(f'(gtk_accel_path "{target}" "F4")')
+    return '\n'.join(entries) + '\n'
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--apply', action='store_true', help='Back up and apply user settings')
+    group.add_argument('--dry-run', action='store_true', help='Show changes (default)')
+    args = parser.parse_args()
+
+    if args.apply:
+        for binary in ('kitty', 'engrampa', 'pcmanfm', 'thunar'):
+            if shutil.which(binary) is None:
+                parser.error(f'Missing {binary}; install it before applying')
+
+    root = Path.home() / '.config'
+    files = {
+        'PCManFM LibFM': root / 'libfm/libfm.conf',
+        'Xfce terminal helper': root / 'xfce4/helpers.rc',
+        'Thunar actions': root / 'Thunar/uca.xml',
+        'Thunar F4 accelerator': root / 'Thunar/accels.scm',
+    }
+    originals = {}
+    for label, path in files.items():
+        if path.is_symlink():
+            parser.error(f'{path} is a symlink; refusing to replace it')
+        originals[label] = path.read_text() if path.exists() else ''
+
+    try:
+        thunar_actions, action_id = update_thunar_action(originals['Thunar actions'])
+    except (ET.ParseError, ValueError) as exc:
+        parser.error(str(exc))
+    updated = {
+        'PCManFM LibFM': update_ini_section(originals['PCManFM LibFM'], 'config', {'terminal': 'kitty', 'archiver': 'engrampa'}),
+        'Xfce terminal helper': update_helpers(originals['Xfce terminal helper']),
+        'Thunar actions': thunar_actions,
+        'Thunar F4 accelerator': update_thunar_accels(originals['Thunar F4 accelerator'], action_id),
+    }
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    for label, path in files.items():
+        if updated[label] == originals[label]:
+            print(f'{label}: already configured')
+            continue
+        print(f'{label}: {path} ' + ('updating' if args.apply else 'would update'))
+        if not args.apply:
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            backup = path.with_name(path.name + '.bak-' + stamp)
+            if backup.exists():
+                parser.error(f'Backup already exists: {backup}')
+            shutil.copy2(path, backup)
+            print(f'  Backup: {backup}')
+        path.write_text(updated[label])
+    if args.apply:
+        print('Restart file managers: pcmanfm --quit ; thunar -q')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

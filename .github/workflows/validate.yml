@@ -156,6 +156,13 @@ jobs:
           grep -F 'bindsym $mod+Shift+t exec --no-startup-id $files' packages/i3/.config/i3/config
           test -x scripts/set-desktop-defaults
 
+      - name: Validate file-manager integrations
+        run: |
+          python3 -m py_compile scripts/configure-file-manager-integrations
+          python3 tests/test_file_manager_integrations.py
+          grep -Fx 'thunar-archive-plugin' config/packages/opensuse/i3-xfce.optional
+          grep -Fx 'exo-tools' config/packages/opensuse/i3-xfce.optional
+
       - name: Validate i3 config
         run: |
           test_home=$(mktemp -d)

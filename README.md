@@ -64,6 +64,24 @@ i3-msg reload
 
 The defaults script is **opt-in**: it sets the XDG folder handler to PCManFM and common archive formats to Engrampa, backing up `mimeapps.list` first. It never removes Thunar or changes the application-specific settings. It requires the applications' `.desktop` files to exist. Verify with `xdg-mime query default inode/directory` and `xdg-mime query default application/zip`. Do not start PCManFM with `--desktop`: the wallpaper is managed by Spotlight.
 
+## File-manager archive and F4 integration
+
+The XDG defaults in `set-desktop-defaults` control which application opens a file, **not** the PCManFM/Thunar `Compress` and `Extract` actions. Install `thunar-archive-plugin` (which includes an Engrampa adapter on Tumbleweed), `exo-tools`, Kitty and Engrampa. LibFM requires `terminal=kitty` and `archiver=engrampa` under `[config]` in `~/.config/libfm/libfm.conf`. Thunar uses its Xfce terminal helper and its own F4 accelerator.
+
+First exit the running file managers to prevent them from overwriting settings when they close. Then apply the opt-in migrator:
+
+```sh
+sudo zypper install thunar thunar-archive-plugin exo-tools pcmanfm engrampa kitty
+pcmanfm --quit || :
+thunar -q || :
+./scripts/configure-file-manager-integrations --dry-run
+./scripts/configure-file-manager-integrations --apply
+```
+
+The migrator creates dated backups of any existing LibFM, Xfce helper, Thunar action and accelerator files, preserving unrelated preferences. It configures the PCManFM archive integration and F4 terminal, selects Kitty for the Xfce terminal helper, and binds the Thunar "Open Terminal Here" action to F4 (or creates the action if missing). Both file managers should now launch Kitty in the selected directory. The Thunar archive plugin uses the preferred archive MIME associations (as configured by `./scripts/set-desktop-defaults --apply`) when choosing an archiver backend.
+
+If Thunar still uses another archive manager, verify that `engrampa.desktop` is your default for the archive MIME type in question, and that `thunar-archive-plugin` provides an Engrampa `.tap` adapter; the plugin may ask you to choose a backend when several are available.
+
 ## i3 colors and wallpaper
 
 Window borders use the **original i3 greys** (`#444444` focused, `#2f343f` inactive), not i3's default blue or a bright Numix accent. The focused workspace is also grey. GTK themes do not automatically set i3 window colors.
