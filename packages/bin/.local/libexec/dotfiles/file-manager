@@ -1,5 +1,5 @@
 #!/bin/dash
-for manager in thunar dolphin pcmanfm nautilus; do
+for manager in pcmanfm thunar dolphin nautilus; do
     if command -v "$manager" >/dev/null 2>&1; then exec "$manager" "${1:-$HOME}"; fi
 done
 exec xdg-open "${1:-$HOME}"

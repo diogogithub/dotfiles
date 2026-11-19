@@ -1,0 +1,69 @@
+#!/bin/dash
+# Opt-in XDG defaults. Back up the user's current associations before updating.
+set -eu
+
+usage() {
+    printf 'Usage: %s [--dry-run|--apply]\n' "$0"
+}
+mode=${1:---dry-run}
+case $mode in
+    --dry-run|--apply) ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { usage >&2; exit 2; }
+
+command -v xdg-mime >/dev/null 2>&1 || {
+    printf 'xdg-mime is required (install xdg-utils).\n' >&2
+    exit 1
+}
+
+desktop_id() {
+    for name do
+        for dir in \
+            "${XDG_DATA_HOME:-$HOME/.local/share}/applications" \
+            /usr/local/share/applications /usr/share/applications; do
+            if [ -f "$dir/$name" ]; then
+                printf '%s\n' "$name"
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
+pcmanfm_id=$(desktop_id pcmanfm.desktop org.lxde.pcmanfm.desktop) || {
+    printf 'PCManFM .desktop entry not found. Install pcmanfm first.\n' >&2
+    exit 1
+}
+engrampa_id=$(desktop_id engrampa.desktop org.mate.Engrampa.desktop) || {
+    printf 'Engrampa .desktop entry not found. Install engrampa first.\n' >&2
+    exit 1
+}
+
+archive_types='application/zip application/x-7z-compressed application/vnd.rar application/x-rar application/x-rar-compressed application/x-tar application/x-compressed-tar application/gzip application/x-gzip application/x-bzip2 application/x-bzip-compressed-tar application/x-xz application/x-xz-compressed-tar'
+
+printf 'Folder default: %s -> inode/directory\n' "$pcmanfm_id"
+printf 'Archive default: %s -> %s\n' "$engrampa_id" "$archive_types"
+
+if [ "$mode" = --dry-run ]; then
+    printf 'Dry run. No user associations were changed.\n'
+    exit 0
+fi
+
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+mkdir -p "$config_home"
+mimeapps=$config_home/mimeapps.list
+if [ -e "$mimeapps" ]; then
+    [ -f "$mimeapps" ] || { printf 'Not a regular file: %s\n' "$mimeapps" >&2; exit 1; }
+    backup=$mimeapps.bak-$(date '+%Y%m%d-%H%M%S')
+    [ ! -e "$backup" ] || { printf 'Backup already exists: %s\n' "$backup" >&2; exit 1; }
+    cp -p "$mimeapps" "$backup"
+    printf 'Saved existing associations: %s\n' "$backup"
+fi
+
+xdg-mime default "$pcmanfm_id" inode/directory
+for mime in $archive_types; do
+    xdg-mime default "$engrampa_id" "$mime"
+done
+printf 'XDG defaults updated.\n'
