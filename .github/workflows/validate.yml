@@ -144,6 +144,18 @@ jobs:
           grep -Fx 'feh' config/packages/opensuse/i3-xfce.optional
           grep -F 'OnUnitActiveSec=6h' packages/wallpaper/.config/systemd/user/dotfiles-spotlight.timer
 
+      - name: Check restored i3 app preferences
+        run: |
+          dash -n scripts/set-desktop-defaults
+          shellcheck -e SC1007 -s dash scripts/set-desktop-defaults
+          grep -Fx 'pcmanfm' config/packages/opensuse/i3-xfce.optional
+          grep -Fx 'engrampa' config/packages/opensuse/i3-xfce.optional
+          grep -F 'assign [class="^Thunderbird$"] $ws9' packages/i3/.config/i3/config.d/10-legacy-windows.conf
+          grep -F 'for_window [class="^TelegramDesktop$"] floating enable' packages/i3/.config/i3/config.d/10-legacy-windows.conf
+          grep -F 'for manager in pcmanfm thunar' packages/bin/.local/libexec/dotfiles/file-manager
+          grep -F 'bindsym $mod+Shift+t exec --no-startup-id $files' packages/i3/.config/i3/config
+          test -x scripts/set-desktop-defaults
+
       - name: Validate i3 config
         run: |
           test_home=$(mktemp -d)

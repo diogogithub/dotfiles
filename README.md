@@ -48,6 +48,22 @@ The i3bar shows XEmbed tray applications. Parcellite starts automatically, and N
 
 A named login entry can be installed locally. Host-specific migration scripts are intentionally not tracked.
 
+## Restored i3 application preferences
+
+The 2023 configuration used **PCManFM** for `Super+Shift+T`, with explicit workspace routing and floating rules for configuration dialogs, calculators, multimedia apps and Telegram. The maintained rules live in `packages/i3/.config/i3/config.d/10-legacy-windows.conf`. Obsolete distribution-specific applications and fixed monitor/DPI overrides were deliberately not restored. `Super+Ctrl+E` opens the same preferred file-manager helper.
+
+Both `pcmanfm` and `engrampa` are optional packages in the `i3-xfce` profile. On Tumbleweed:
+
+```sh
+sudo zypper install pcmanfm engrampa
+./scripts/set-desktop-defaults --dry-run
+./scripts/set-desktop-defaults --apply
+i3 -C -c ~/.config/i3/config
+i3-msg reload
+```
+
+The defaults script is **opt-in**: it sets the XDG folder handler to PCManFM and common archive formats to Engrampa, backing up `mimeapps.list` first. It never removes Thunar or changes the application-specific settings. It requires the applications' `.desktop` files to exist. Verify with `xdg-mime query default inode/directory` and `xdg-mime query default application/zip`. Do not start PCManFM with `--desktop`: the wallpaper is managed by Spotlight.
+
 ## i3 colors and wallpaper
 
 Window borders use the **original i3 greys** (`#444444` focused, `#2f343f` inactive), not i3's default blue or a bright Numix accent. The focused workspace is also grey. GTK themes do not automatically set i3 window colors.
