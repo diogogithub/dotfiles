@@ -35,7 +35,14 @@ for group in commands xfwm4; do
 done
 ```
 
-This is a one-time account-wide change. It also disables shortcuts in the standalone Xfce session. Restart the graphical session afterwards. Mouse, touchpad and GTK settings remain unchanged. The i3bar manages its own appearance separately from GTK.
+This is a one-time account-wide change. It also disables shortcuts in the standalone Xfce session. Restart the graphical session afterwards. Mouse, touchpad and GTK settings remain unchanged. Numix can be selected in Xfce Appearance settings, and the i3bar still uses its own theme.
+
+On openSUSE, install Numix GTK packages from the distribution and the icon themes from their official sources:
+
+```sh
+sudo zypper install gtk2-metatheme-numix gtk3-metatheme-numix parcellite
+./scripts/install-numix-icons
+```
 
 The i3bar shows XEmbed tray applications. Parcellite starts automatically, and Nextcloud uses the user's XDG autostart entry. Applications that publish only StatusNotifierItem icons need `snixembed`, which the profile starts if installed. It is not part of the default Tumbleweed package list. The `i3blocks` clock updates every second.
 

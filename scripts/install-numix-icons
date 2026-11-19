@@ -1,0 +1,29 @@
+#!/bin/dash
+set -eu
+command -v git >/dev/null 2>&1 || { printf 'git is required\n' >&2; exit 1; }
+
+umask 077
+destination=${XDG_DATA_HOME:-"$HOME/.local/share"}/icons
+mkdir -p "$destination"
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT HUP INT TERM
+
+# Official Numix projects. Install for the current user, without sudo.
+git clone --quiet --depth 1 https://github.com/numixproject/numix-icon-theme.git "$work/base"
+git clone --quiet --depth 1 https://github.com/numixproject/numix-icon-theme-circle.git "$work/circle"
+
+for theme in Numix Numix-Light Numix-Circle Numix-Circle-Light; do
+    case $theme in
+        Numix|Numix-Light) source_dir=$work/base ;;
+        *) source_dir=$work/circle ;;
+    esac
+    [ -f "$source_dir/$theme/index.theme" ] || { printf 'Missing %s in upstream repository\n' "$theme" >&2; exit 1; }
+    if [ -e "$destination/$theme" ] || [ -L "$destination/$theme" ]; then
+        printf 'Already installed: %s\n' "$destination/$theme"
+    else
+        cp -R "$source_dir/$theme" "$destination/$theme"
+        printf 'Installed: %s\n' "$destination/$theme"
+    fi
+done
+
+printf 'Start a new i3 session to load the Numix-Circle icons.\n'

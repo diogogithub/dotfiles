@@ -141,6 +141,12 @@ jobs:
           stow --dir="$PWD/packages" --target="$test_home" --no-folding i3
           HOME="$test_home" i3 -C -c "$test_home/.config/i3/config"
 
+      - name: Validate Numix icon installer
+        run: |
+          dash -n scripts/install-numix-icons
+          shellcheck -e SC1007 -s dash scripts/install-numix-icons
+          grep -Fx 'gtk3-metatheme-numix' config/packages/opensuse/i3-xfce.optional
+
       - name: Check i3 Xfce services and tray
         run: |
           grep -F 'start_once xfsettingsd xfsettingsd --sm-client-disable' packages/bin/.local/libexec/dotfiles/i3-autostart
