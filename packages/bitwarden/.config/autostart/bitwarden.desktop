@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bitwarden
+Comment=Password manager and SSH agent
+Exec=sh -c "$HOME/.local/libexec/dotfiles/bitwarden-launch"
+TryExec=sh
+Terminal=false
+OnlyShowIn=i3;
+X-GNOME-Autostart-enabled=true

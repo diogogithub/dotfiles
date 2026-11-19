@@ -1,0 +1,237 @@
+#!/bin/dash
+# Intentional word splitting is used only for validated package lists.
+# shellcheck disable=SC2086
+set -eu
+
+ROOT=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+UPGRADES=keep
+BACKUPS=keep
+KEYD=keep
+XKB_ABNT2=keep
+INIT_BACKUP=0
+DRY_RUN=0
+
+usage() {
+    cat <<'USAGE'
+Usage: ./system-setup [options]
+
+Options:
+  --upgrades POLICY   security, full, off, or keep (default: keep)
+  --backups MODE      on, off, or keep (default: keep)
+  --keyd MODE         on, off, or keep (default: keep)
+  --xkb-abnt2 MODE    on, off, or keep (default: keep)
+  --init-backup       run `restic init` before enabling backup timers
+  --dry-run           print actions without changing the system
+  -h, --help          show this help
+
+Debian uses unattended-upgrades. openSUSE Leap supports security or full;
+Tumbleweed requires full because supported updates are distribution upgrades.
+`--keyd on` installs the shared /etc/keyd/default.conf. `--xkb-abnt2 on`
+persists the Brazilian ABNT2 layout with Right Alt as AltGr through XKB.
+USAGE
+}
+say() { printf '%s\n' "$*"; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+as_root() { if [ "$(id -u)" -eq 0 ]; then "$@"; elif have sudo; then sudo "$@"; else die 'sudo is required'; fi; }
+run_root() { if [ "$DRY_RUN" -eq 1 ]; then printf 'would run:'; printf ' %s' "$@"; printf '\n'; else as_root "$@"; fi; }
+run_root_ignore() { if [ "$DRY_RUN" -eq 1 ]; then printf 'would run (ignore missing):'; printf ' %s' "$@"; printf '\n'; else as_root "$@" || true; fi; }
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --upgrades) [ "$#" -ge 2 ] || die '--upgrades needs a value'; UPGRADES=$2; shift 2 ;;
+        --backups) [ "$#" -ge 2 ] || die '--backups needs a value'; BACKUPS=$2; shift 2 ;;
+        --keyd) [ "$#" -ge 2 ] || die '--keyd needs a value'; KEYD=$2; shift 2 ;;
+        --xkb-abnt2) [ "$#" -ge 2 ] || die '--xkb-abnt2 needs a value'; XKB_ABNT2=$2; shift 2 ;;
+        --init-backup) INIT_BACKUP=1; shift ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "unknown option: $1" ;;
+    esac
+done
+case $UPGRADES in security|full|off|keep) ;; *) die "invalid upgrade policy: $UPGRADES" ;; esac
+case $BACKUPS in on|off|keep) ;; *) die "invalid backup mode: $BACKUPS" ;; esac
+case $KEYD in on|off|keep) ;; *) die "invalid keyd mode: $KEYD" ;; esac
+case $XKB_ABNT2 in on|off|keep) ;; *) die "invalid XKB ABNT2 mode: $XKB_ABNT2" ;; esac
+
+OS_ID=unknown
+OS_LIKE=
+if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    OS_ID=${ID:-unknown}
+    OS_LIKE=${ID_LIKE:-}
+fi
+case "$OS_ID:$OS_LIKE" in
+    debian:*|ubuntu:*|*:debian*) DISTRO=debian ;;
+    opensuse-tumbleweed:*|opensuse-leap:*|sles:*|*:suse*|*:opensuse*) DISTRO=opensuse ;;
+    *) die "unsupported OS: $OS_ID" ;;
+esac
+
+read_package_file() { sed 's/[[:space:]]*#.*$//; /^[[:space:]]*$/d' "$1"; }
+append_package_file() {
+    apf_path=$1
+    apf_packages=$(read_package_file "$apf_path" | tr '\n' ' ')
+    MAINTENANCE_PACKAGES="${MAINTENANCE_PACKAGES}${MAINTENANCE_PACKAGES:+ }$apf_packages"
+}
+MAINTENANCE_PACKAGES=
+if [ "$UPGRADES" != keep ] && [ "$UPGRADES" != off ]; then
+    append_package_file "$ROOT/config/packages/$DISTRO/upgrade.required"
+fi
+if [ "$BACKUPS" = on ]; then
+    append_package_file "$ROOT/config/packages/$DISTRO/backup.required"
+fi
+if [ "$KEYD" = on ]; then
+    append_package_file "$ROOT/config/packages/$DISTRO/keyd.required"
+fi
+if [ -n "$MAINTENANCE_PACKAGES" ]; then
+    case $DISTRO in
+        debian)
+            run_root apt-get update
+            run_root apt-get install -y $MAINTENANCE_PACKAGES
+            ;;
+        opensuse)
+            run_root zypper --non-interactive install $MAINTENANCE_PACKAGES
+            ;;
+    esac
+fi
+
+install_file() {
+    if [ "$DRY_RUN" -eq 1 ]; then say "would install: $2"; else as_root install -D -m "$3" "$1" "$2"; fi
+}
+remove_root_file() { if [ "$DRY_RUN" -eq 1 ]; then say "would remove: $1"; else as_root rm -f "$1"; fi; }
+write_root_file() {
+    wrf_path=$1
+    wrf_mode=$2
+    wrf_tmp=${TMPDIR:-/tmp}/dotfiles-system.$$
+    cat > "$wrf_tmp"
+    if [ "$DRY_RUN" -eq 1 ]; then say "would write: $wrf_path"; else as_root install -D -m "$wrf_mode" "$wrf_tmp" "$wrf_path"; fi
+    rm -f "$wrf_tmp"
+}
+
+configure_debian_upgrades() {
+    case $UPGRADES in
+        keep) return 0 ;;
+        off)
+            write_root_file /etc/apt/apt.conf.d/20auto-upgrades 0644 <<'APT'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+APT
+            ;;
+        security|full)
+            write_root_file /etc/apt/apt.conf.d/20auto-upgrades 0644 <<'APT'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+APT
+            if [ "$UPGRADES" = security ]; then
+                write_root_file /etc/apt/apt.conf.d/52unattended-upgrades-local 0644 <<'APT'
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+};
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+APT
+            else
+                write_root_file /etc/apt/apt.conf.d/52unattended-upgrades-local 0644 <<'APT'
+Unattended-Upgrade::Origins-Pattern {
+    "origin=Debian,codename=${distro_codename},label=Debian";
+    "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+    "origin=Debian,codename=${distro_codename}-updates,label=Debian";
+};
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+APT
+            fi
+            run_root systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+            ;;
+    esac
+}
+
+configure_opensuse_upgrades() {
+    case $UPGRADES in
+        keep) return 0 ;;
+        off)
+            run_root_ignore systemctl disable --now dotfiles-upgrade.timer
+            return 0
+            ;;
+    esac
+    if [ "$OS_ID" = opensuse-tumbleweed ] && [ "$UPGRADES" != full ]; then
+        die 'Tumbleweed automatic updates must use --upgrades full (zypper dup)'
+    fi
+    install_file "$ROOT/maintenance/bin/dotfiles-upgrade" /usr/local/libexec/dotfiles-upgrade 0755
+    install_file "$ROOT/maintenance/systemd/dotfiles-upgrade.service" /etc/systemd/system/dotfiles-upgrade.service 0644
+    install_file "$ROOT/maintenance/systemd/dotfiles-upgrade.timer" /etc/systemd/system/dotfiles-upgrade.timer 0644
+    write_root_file /etc/dotfiles-maintenance.conf 0644 <<EOF_CONFIG
+UPGRADE_POLICY=$UPGRADES
+EOF_CONFIG
+    if [ "$UPGRADES" = security ]; then
+        write_root_file /etc/systemd/system/dotfiles-upgrade.timer.d/schedule.conf 0644 <<'EOF_TIMER'
+[Timer]
+OnCalendar=
+OnCalendar=daily
+EOF_TIMER
+    else
+        remove_root_file /etc/systemd/system/dotfiles-upgrade.timer.d/schedule.conf
+    fi
+    run_root systemctl daemon-reload
+    run_root systemctl enable --now dotfiles-upgrade.timer
+}
+
+configure_backups() {
+    case $BACKUPS in
+        keep) return 0 ;;
+        off)
+            run_root_ignore systemctl disable --now dotfiles-backup.timer dotfiles-backup-check.timer
+            return 0
+            ;;
+    esac
+    [ -r /etc/dotfiles-private/restic.env ] || [ "$DRY_RUN" -eq 1 ] || die 'install private/system/etc/dotfiles-private/restic.env first with ./private-apply --system'
+    install_file "$ROOT/maintenance/bin/dotfiles-backup" /usr/local/libexec/dotfiles-backup 0755
+    install_file "$ROOT/maintenance/bin/dotfiles-backup-check" /usr/local/libexec/dotfiles-backup-check 0755
+    for unit in dotfiles-backup.service dotfiles-backup.timer dotfiles-backup-check.service dotfiles-backup-check.timer; do
+        install_file "$ROOT/maintenance/systemd/$unit" "/etc/systemd/system/$unit" 0644
+    done
+    install_file "$ROOT/maintenance/restic/include" /etc/dotfiles-backup/include 0644
+    install_file "$ROOT/maintenance/restic/exclude" /etc/dotfiles-backup/exclude 0644
+    if [ "$INIT_BACKUP" -eq 1 ]; then
+        if [ "$DRY_RUN" -eq 1 ]; then
+            say 'would initialize the Restic repository using /etc/dotfiles-private/restic.env'
+        else
+            as_root /bin/dash -c 'set -a; . /etc/dotfiles-private/restic.env; set +a; exec restic init'
+        fi
+    fi
+    run_root systemctl daemon-reload
+    run_root systemctl enable --now dotfiles-backup.timer dotfiles-backup-check.timer
+}
+
+configure_keyd() {
+    case $KEYD in
+        keep) return 0 ;;
+        off)
+            run_root_ignore systemctl disable --now keyd.service
+            return 0
+            ;;
+    esac
+    install_file "$ROOT/system/keyd/default.conf" /etc/keyd/default.conf 0644
+    run_root systemctl enable keyd.service
+    run_root systemctl restart keyd.service
+}
+
+configure_xkb_abnt2() {
+    case $XKB_ABNT2 in
+        keep) return 0 ;;
+        on)
+            run_root localectl set-x11-keymap br abnt2 '' lv3:ralt_switch
+            ;;
+        off)
+            run_root localectl set-x11-keymap br abnt2 '' ''
+            ;;
+    esac
+}
+
+[ "$DISTRO" != debian ] || configure_debian_upgrades
+[ "$DISTRO" != opensuse ] || configure_opensuse_upgrades
+configure_backups
+configure_keyd
+configure_xkb_abnt2
+say 'System configuration applied.'

@@ -1,0 +1,15 @@
+local map = vim.keymap.set
+
+map('n', '<Esc>', '<cmd>nohlsearch<CR>')
+map('n', '<leader>w', '<cmd>write<CR>', { desc = 'Write buffer' })
+map('n', '<leader>q', '<cmd>quit<CR>', { desc = 'Quit window' })
+map('n', '<leader>e', '<cmd>Explore<CR>', { desc = 'File explorer' })
+map('n', '<C-h>', '<C-w>h', { desc = 'Focus left' })
+map('n', '<C-j>', '<C-w>j', { desc = 'Focus down' })
+map('n', '<C-k>', '<C-w>k', { desc = 'Focus up' })
+map('n', '<C-l>', '<C-w>l', { desc = 'Focus right' })
+map('n', '[d', vim.diagnostic.goto_prev, { desc = 'Previous diagnostic' })
+map('n', ']d', vim.diagnostic.goto_next, { desc = 'Next diagnostic' })
+map('n', '<leader>d', vim.diagnostic.open_float, { desc = 'Diagnostic details' })
+map('v', '<', '<gv')
+map('v', '>', '>gv')

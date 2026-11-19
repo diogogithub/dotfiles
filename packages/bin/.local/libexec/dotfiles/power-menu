@@ -1,0 +1,17 @@
+#!/bin/dash
+set -eu
+menu='lock
+logout
+suspend
+reboot
+poweroff'
+if command -v rofi >/dev/null 2>&1; then choice=$(printf '%s\n' "$menu" | rofi -dmenu -i -p 'Power'); elif command -v dmenu >/dev/null 2>&1; then choice=$(printf '%s\n' "$menu" | dmenu -i -p 'Power'); else printf '%s\n' "$menu"; printf 'Choice: ' >&2; IFS= read -r choice; fi
+case ${choice:-} in
+    lock) exec "$HOME/.local/libexec/dotfiles/lock" ;;
+    logout) i3-msg exit ;;
+    suspend) systemctl suspend ;;
+    reboot|poweroff)
+        if command -v rofi >/dev/null 2>&1; then confirm=$(printf 'no\nyes\n' | rofi -dmenu -i -p "Confirm $choice?"); else printf 'Type yes to confirm %s: ' "$choice" >&2; IFS= read -r confirm; fi
+        [ "$confirm" = yes ] && systemctl "$choice"
+        ;;
+esac

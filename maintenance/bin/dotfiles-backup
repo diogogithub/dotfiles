@@ -1,0 +1,37 @@
+#!/bin/dash
+set -eu
+umask 077
+
+ENV_FILE=/etc/dotfiles-private/restic.env
+INCLUDE_FILE=/etc/dotfiles-backup/include
+EXCLUDE_FILE=/etc/dotfiles-backup/exclude
+INVENTORY_DIR=/var/backups/dotfiles-inventory
+
+[ -r "$ENV_FILE" ] || { printf 'missing root-only restic configuration: %s\n' "$ENV_FILE" >&2; exit 1; }
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+: "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY is required}"
+if [ -n "${RESTIC_PASSWORD_FILE:-}" ]; then
+    export RESTIC_PASSWORD_FILE
+elif [ -z "${RESTIC_PASSWORD_COMMAND:-}" ]; then
+    printf 'set RESTIC_PASSWORD_FILE or RESTIC_PASSWORD_COMMAND in %s\n' "$ENV_FILE" >&2
+    exit 1
+fi
+export RESTIC_REPOSITORY
+mkdir -p "$INVENTORY_DIR"
+
+if command -v dpkg-query >/dev/null 2>&1; then
+    dpkg-query -W -f='${binary:Package}\t${Version}\n' > "$INVENTORY_DIR/packages.tsv"
+    apt-mark showmanual > "$INVENTORY_DIR/manual-packages.txt"
+elif command -v rpm >/dev/null 2>&1; then
+    rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\n' | sort > "$INVENTORY_DIR/packages.tsv"
+fi
+systemctl list-unit-files --state=enabled --no-legend 2>/dev/null > "$INVENTORY_DIR/enabled-units.txt" || true
+lsblk -f > "$INVENTORY_DIR/filesystems.txt" 2>/dev/null || true
+
+set -- backup --files-from "$INCLUDE_FILE" --one-file-system --tag system
+[ ! -f "$EXCLUDE_FILE" ] || set -- "$@" --exclude-file "$EXCLUDE_FILE"
+restic "$@"
+restic forget --keep-daily 7 --keep-weekly 5 --keep-monthly 12 --keep-yearly 3 --prune

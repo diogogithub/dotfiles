@@ -1,0 +1,9 @@
+tmux
+ripgrep
+fzf
+jq
+direnv
+shellcheck
+zsh-autosuggestions
+zsh-syntax-highlighting
+gnupg

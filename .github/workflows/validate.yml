@@ -1,0 +1,211 @@
+name: validate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Install validators
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dash i3-wm lua5.4 openssh-client shellcheck stow zsh >/dev/null
+
+      - name: Check interpreter policy
+        run: |
+          test "$(head -n 1 bootstrap)" = '#!/bin/sh'
+          for file in apply revert private-apply system-setup tests/roundtrip.sh maintenance/bin/* packages/bin/.local/libexec/dotfiles/*; do
+            test "$(head -n 1 "$file")" = '#!/bin/dash'
+          done
+
+      - name: Check shell syntax
+        run: |
+          sh -n bootstrap
+          dash -n apply revert private-apply system-setup tests/roundtrip.sh maintenance/bin/* packages/bin/.local/libexec/dotfiles/*
+          zsh -n packages/shell/.zprofile packages/shell/.zshrc packages/shell/.config/zsh/*.zsh
+
+      - name: ShellCheck bootstrap
+        run: shellcheck -e SC1007 -f gcc -s sh bootstrap
+
+      - name: ShellCheck Stow transaction scripts
+        run: shellcheck -e SC1007 -f gcc -s dash apply revert tests/roundtrip.sh
+
+      - name: ShellCheck private overlay
+        run: shellcheck -e SC1007 -f gcc -s dash private-apply
+
+      - name: ShellCheck system setup
+        run: shellcheck -e SC1007,SC2086 -f gcc -s dash system-setup
+
+      - name: ShellCheck maintenance helpers
+        run: shellcheck -e SC1007 -f gcc -s dash maintenance/bin/*
+
+      - name: ShellCheck desktop helpers
+        run: shellcheck -e SC1007 -f gcc -s dash packages/bin/.local/libexec/dotfiles/*
+
+      - name: ShellCheck shared shell fragments
+        run: shellcheck -e SC1007 -f gcc -s dash packages/shell/.profile packages/shell/.config/shell/aliases.sh
+
+      - name: Check Lua syntax
+        run: find packages/nvim -name '*.lua' -exec luac5.4 -p {} +
+
+      - name: Test interactive Zsh prompt and widgets
+        run: |
+          zsh -fic '
+            source packages/shell/.config/zsh/30-keybindings.zsh
+            source packages/shell/.config/zsh/50-prompt.zsh
+            false
+            _dotfiles_prompt_precmd
+            [[ "$PROMPT_STATUS" == *exit:1* ]] || exit 1
+            true
+            _dotfiles_prompt_precmd
+            [[ "$PROMPT_STATUS" == *exit:0* ]] || exit 1
+            zle -l | grep -Fx up-line-or-beginning-search
+            zle -l | grep -Fx down-line-or-beginning-search
+            [[ "$(print -r -- "$PROMPT" | wc -l)" -eq 1 ]] || exit 1
+            [[ "$PROMPT" == *%D* ]] || exit 1
+            [[ "$PROMPT" == *PROMPT_STATUS* ]] || exit 1
+            VIRTUAL_ENV=/tmp/my-project/.venv
+            _dotfiles_prompt_precmd
+            [[ "$PROMPT_PYTHON" == *py:.venv* ]] || exit 1
+            unset VIRTUAL_ENV
+            CONDA_DEFAULT_ENV=research
+            _dotfiles_prompt_precmd
+            [[ "$PROMPT_PYTHON" == *py:research* ]] || exit 1
+            unset CONDA_DEFAULT_ENV
+            PYENV_VERSION=3.13.1
+            _dotfiles_prompt_precmd
+            [[ "$PROMPT_PYTHON" == *py:3.13.1* ]] || exit 1
+            unset PYENV_VERSION
+            _dotfiles_prompt_precmd
+            [[ -z "$PROMPT_PYTHON" ]] || exit 1
+            zstyle -s ":vcs_info:git:*" formats git_format
+            [[ "$git_format" == *git:* ]] || exit 1
+          '
+
+      - name: Test apply and revert under Dash
+        run: /bin/dash tests/roundtrip.sh
+
+      - name: Check package manifests
+        run: |
+          ./apply --profile minimal --list-packages | grep -F 'dash'
+          ./apply --profile i3-xfce --list-packages | grep -F 'i3-wm'
+          grep -Fx 'keyd' config/packages/debian/keyd.required
+          grep -Fx 'keyd' config/packages/opensuse/keyd.required
+
+      - name: Validate finalized keyboard configuration
+        run: |
+          cat > /tmp/keyd.expected <<'EOF'
+          [ids]
+          *
+
+          [main]
+          capslock = layer(control)
+          ro = rightshift
+          leftcontrol = layer(hyper)
+
+          [hyper:C-A-M-S]
+          capslock = capslock
+          EOF
+          diff -u /tmp/keyd.expected system/keyd/default.conf
+          ./system-setup --keyd on --xkb-abnt2 on --dry-run | grep -F 'lv3:ralt_switch'
+
+      - name: Validate private overlay dry-run
+        run: ./private-apply --agent none --dry-run
+
+      - name: Validate Kitty shell
+        run: |
+          grep -Fx 'shell /usr/bin/zsh -l' packages/kitty/.config/kitty/kitty.conf
+          grep -Fx 'zsh' config/packages/opensuse/base.required
+          grep -Fx 'zsh' config/packages/debian/base.required
+
+      - name: Check subdued i3 window palette
+        run: |
+          grep -Fx 'set $numix_active #444444' packages/i3/.config/i3/config
+          grep -Fx 'set $numix_dark #2f343f' packages/i3/.config/i3/config
+          grep -F 'focused_workspace $bar_focus $bar_focus' packages/i3/.config/i3/config
+          ! grep -qi '#d64937' packages/i3/.config/i3/config
+
+      - name: Validate i3 config
+        run: |
+          test_home=$(mktemp -d)
+          stow --dir="$PWD/packages" --target="$test_home" --no-folding i3
+          HOME="$test_home" i3 -C -c "$test_home/.config/i3/config"
+
+      - name: Check i3 Xfce services and tray
+        run: |
+          grep -F 'start_once xfsettingsd xfsettingsd --sm-client-disable' packages/bin/.local/libexec/dotfiles/i3-autostart
+          ! grep -q 'i3-xfsettingsd' packages/bin/.local/libexec/dotfiles/i3-autostart
+          test ! -e packages/bin/.local/libexec/dotfiles/i3-xfsettingsd
+          grep -F 'start_once parcellite' packages/bin/.local/libexec/dotfiles/i3-autostart
+          grep -F 'command -v snixembed' packages/bin/.local/libexec/dotfiles/i3-autostart
+          grep -F ":%S" packages/bin/.local/libexec/dotfiles/i3block
+          grep -A1 '^\[time\]' packages/i3/.config/i3/i3blocks.conf | grep -Fx 'interval=1'
+
+      - name: Validate systemd units
+        run: |
+          sudo install -D -m 0755 maintenance/bin/dotfiles-upgrade /usr/local/libexec/dotfiles-upgrade
+          sudo install -D -m 0755 maintenance/bin/dotfiles-backup /usr/local/libexec/dotfiles-backup
+          sudo install -D -m 0755 maintenance/bin/dotfiles-backup-check /usr/local/libexec/dotfiles-backup-check
+          systemd-analyze verify maintenance/systemd/*.service maintenance/systemd/*.timer packages/ssh-agent/.config/systemd/user/*.service packages/ssh-agent/.config/systemd/user/*.socket
+
+  debian-roundtrip:
+    runs-on: ubuntu-latest
+    container: debian:stable-slim
+    steps:
+      - name: Install prerequisites
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dash findutils git stow >/dev/null
+
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Test Debian
+        run: |
+          test -x /bin/dash
+          /bin/dash -n apply revert private-apply system-setup tests/roundtrip.sh maintenance/bin/* packages/bin/.local/libexec/dotfiles/*
+          /bin/dash tests/roundtrip.sh
+          ./bootstrap --profile minimal --install --dry-run
+          ./apply --profile minimal --list-packages | grep -F 'dash'
+          ./system-setup --upgrades security --backups off --keyd on --xkb-abnt2 on --dry-run
+
+  opensuse-roundtrip:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - opensuse/leap:latest
+          - opensuse/tumbleweed:latest
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install prerequisites
+        run: zypper --quiet --non-interactive install dash findutils git gzip stow tar
+
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Test openSUSE
+        run: |
+          test -x /bin/dash
+          /bin/dash -n apply revert private-apply system-setup tests/roundtrip.sh maintenance/bin/* packages/bin/.local/libexec/dotfiles/*
+          /bin/dash tests/roundtrip.sh
+          ./bootstrap --profile minimal --install --dry-run
+          ./apply --profile minimal --list-packages | grep -F 'dash'
+          if grep -q '^ID="\?opensuse-tumbleweed' /etc/os-release; then
+            ./system-setup --upgrades full --backups off --keyd on --xkb-abnt2 on --dry-run
+          else
+            ./system-setup --upgrades security --backups off --keyd on --xkb-abnt2 on --dry-run
+          fi

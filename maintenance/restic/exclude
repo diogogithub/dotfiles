@@ -1,0 +1,8 @@
+**/.cache/**
+**/.local/share/Trash/**
+**/node_modules/**
+**/.npm/**
+**/.cargo/registry/**
+**/.rustup/**
+**/.var/app/*/cache/**
+/home/*/Downloads/**

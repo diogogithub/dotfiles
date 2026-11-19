@@ -1,0 +1,30 @@
+#!/bin/dash
+# Match full command names: Linux truncates process names to 15 bytes.
+start_once() {
+    process=$1
+    shift
+    if ! pgrep -u "$(id -u)" -f "(^|/)$process([[:space:]]|$)" >/dev/null 2>&1; then
+        "$@" >/dev/null 2>&1 &
+    fi
+}
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE I3SOCK >/dev/null 2>&1 || true; fi
+if command -v systemctl >/dev/null 2>&1; then systemctl --user import-environment DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE I3SOCK >/dev/null 2>&1 || true; fi
+# Keep Xfce input devices, appearance and display settings.
+# Disable conflicting shortcuts once through xfconf-query before using this profile.
+command -v xfsettingsd >/dev/null 2>&1 && start_once xfsettingsd xfsettingsd --sm-client-disable
+command -v xfce4-power-manager >/dev/null 2>&1 && start_once xfce4-power-manager xfce4-power-manager
+command -v xfce4-screensaver >/dev/null 2>&1 && start_once xfce4-screensaver xfce4-screensaver
+command -v nm-applet >/dev/null 2>&1 && start_once nm-applet nm-applet
+command -v picom >/dev/null 2>&1 && start_once picom picom --config "$HOME/.config/picom.conf"
+for agent in /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 /usr/libexec/polkit-gnome-authentication-agent-1 /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1; do
+    if [ -x "$agent" ] && ! pgrep -f polkit-gnome-authentication-agent-1 >/dev/null 2>&1; then "$agent" >/dev/null 2>&1 & break; fi
+done
+
+# Legacy tray apps use i3bar's XEmbed tray. snixembed adds SNI support if installed.
+command -v snixembed >/dev/null 2>&1 && start_once snixembed snixembed
+command -v parcellite >/dev/null 2>&1 && start_once parcellite parcellite
+
+# User autostart entries include Bitwarden and Nextcloud.
+if command -v dex >/dev/null 2>&1; then
+    dex --autostart --environment i3 --search-paths "$HOME/.config/autostart" >/dev/null 2>&1 &
+fi

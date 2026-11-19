@@ -1,0 +1,7 @@
+#!/bin/dash
+if command -v xfce4-screenshooter >/dev/null 2>&1; then exec xfce4-screenshooter -r; fi
+if command -v spectacle >/dev/null 2>&1; then exec spectacle -r; fi
+if command -v flameshot >/dev/null 2>&1; then exec flameshot gui; fi
+if command -v scrot >/dev/null 2>&1; then exec scrot -s; fi
+printf 'No supported screenshot tool found.\n' >&2
+exit 1

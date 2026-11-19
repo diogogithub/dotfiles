@@ -1,290 +1,93 @@
-Dotfiles
-========
+# Dotfiles
 
-This is my collection of [configuration files](http://dotfiles.github.io/).
+Linux workstation configuration for openSUSE and Debian. GNU Stow links the files into the home directory. Dash runs system scripts. Kitty opens Zsh as a login shell without changing the user's account shell.
 
-Usage
------
+## Install
 
-Pull the repository, and then create the symbolic links [using GNU
-stow](https://alexpearce.me/2016/02/managing-dotfiles-with-stow/).
-
-```bash
-$ git clone https://github.com/diogogithub/.dotfiles.git ~/.dotfiles
-$ cd ~/.dotfiles
-$ stow tools templates composer feh geany ghc git i3 mariadbcli pgsqlcli ranger terminfo theme xorg-server zathura  # plus whatever else you'd like
+```sh
+git clone https://github.com/diogogithub/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
+./bootstrap --profile i3-xfce --install --dry-run
+./bootstrap --profile i3-xfce --install
 ```
-Applications
-------------
 
-**OS**: Debian
-**Desktop Environment**: XFCE
-**WM**: i3
-**LockScreen**: light-lock
-**Launcher**: j4-dmenu-desktop
-**Browser**: firefox-esr
-**Development Environment**: Neovim
-**Document Viewer**: Atril
-**File Manager**: PCManFM
-**Music**: clementine
-**Video**: totem
+Choose the `i3-xfce` profile for a native X11 i3 session with Xfce services. The separate `kde` profile does not combine Plasma with i3. The `common` and `minimal` profiles install fewer desktop files. No profile changes the display manager or logs out the current session.
 
+`bootstrap` installs Dash when necessary, then runs `apply`. After installation, run `./apply` and `./revert` directly. Run `./apply --profile i3-xfce --list-packages` to inspect the package lists.
 
-License
--------
+## Profiles and packages
 
-[MIT](http://opensource.org/licenses/MIT).
+Profiles list Stow directories in `config/stow-profiles/`. Distribution-specific package lists live in `config/packages/`. The install script treats `*.required` packages as mandatory and attempts `*.optional` packages separately.
 
-## Installing
+The `i3-xfce` profile uses i3, Xfce settings and power management, Picom, NetworkManager's applet, Rofi and i3blocks. Host-specific monitor commands belong in `~/.config/i3/config.d/90-host.conf`.
 
-### Download
+The `i3-xfce` profile starts the normal `xfsettingsd`, which applies Xfce mouse preferences and GTK settings. Xfce application shortcuts can conflict with i3. To disable them for the user account, first back up the `xfce4-keyboard-shortcuts` channel and then clear the custom shortcuts and override the defaults:
 
-Download the XFCE CD1 from: https://cdimage.debian.org/debian-cd/current/amd64/iso-cd
+```sh
+backup="$HOME/.local/state/dotfiles/xfce-shortcuts-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup"
+xfconf-query -c xfce4-keyboard-shortcuts -lv > "$backup/shortcuts.txt"
+source_file="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml"
+[ ! -f "$source_file" ] || cp -p "$source_file" "$backup/"
+for group in commands xfwm4; do
+    xfconf-query -c xfce4-keyboard-shortcuts -p "/$group/custom" -R -r || :
+    xfconf-query -c xfce4-keyboard-shortcuts -p "/$group/custom/override" -n -t bool -s true
+done
+```
 
-### Repositories Keys
+This is a one-time account-wide change. It also disables shortcuts in the standalone Xfce session. Restart the graphical session afterwards. Mouse, touchpad and GTK settings remain unchanged. The i3bar manages its own appearance separately from GTK.
 
-    wget --quiet -O - https://insomnia.rest/keys/debian-public.key.asc | sudo apt-key add -
+The i3bar shows XEmbed tray applications. Parcellite starts automatically, and Nextcloud uses the user's XDG autostart entry. Applications that publish only StatusNotifierItem icons need `snixembed`, which the profile starts if installed. It is not part of the default Tumbleweed package list. The `i3blocks` clock updates every second.
 
+A named login entry can be installed locally. Host-specific migration scripts are intentionally not tracked.
 
-### USB flash installation media
+## i3 appearance
 
-    dd if=debian-9.2.1-amd64-xfce-CD-1.iso of=/dev/sdb bs=4M
+Window borders use the original i3 greys (`#444444` focused, `#2f343f` inactive), rather than the default blue. The focused workspace is grey as well. GTK themes do not set i3 window colors.
 
-### Software selection
+## Backups and rollback
 
-Select:
+`apply` backs up conflicting files below `~/.local/state/dotfiles/backups/` before linking replacements. It writes a manifest for `revert`. Check proposed changes first:
 
-* print server
-* standard system utilities
-* XFCE
+```sh
+./apply --profile i3-xfce --dry-run
+./apply --profile i3-xfce --install
+```
 
-## Setting the repositories
+To switch profiles, run `./revert --dry-run` and `./revert`, then apply the new profile. Keep a separate backup before migrating a configured machine. The Stow backup covers linked paths, not the whole home directory.
 
-    apt install aptitude
-    aptitude install debian-archive-keyring
-    aptitude install synaptic apt-xapian-index gdebi
+## Bitwarden SSH agent
 
-## SUDO
+Enable the SSH agent in the Bitwarden desktop application. Select it for shell sessions with:
 
-### Install sudo
-    aptitude install sudo
+```sh
+./private-apply --agent bitwarden
+```
 
-### Add Administrator to sudoers
-    adduser {username} sudo
+The shell uses the native Linux socket at `~/.bitwarden-ssh-agent.sock`, or the Flatpak socket if Bitwarden is installed as a Flatpak. The socket only works while Bitwarden is running and its SSH agent is enabled.
 
-## Hardware
+The i3 profile installs an autostart entry for Bitwarden. The launcher checks standard executable and AppImage locations. If an AppImage has a different location, use a stable symlink at `~/Applications/Bitwarden.AppImage`. Do not use a path under `/tmp/.mount_*`.
 
-### Firmware
-    aptitude install inotify-tools inotify-hookable sassc
+## Local files and private data
 
-### Battery and Overheating
+The `private/` directory supports files for an individual host. `./private-apply --dry-run` lists its planned changes. `./private-apply --agent none` applies them without configuring an SSH agent.
 
-* tlp
-* tlp-rdw
-* thermald
-* cpufreqd
+Personal Git identity and signing options belong in `~/.config/git/local.conf`. Host-specific configuration stays outside the tracked Stow files. Do not commit credentials.
 
-`sudo aptitude install tlp tlp-rdw thermald cpufreqd`
+## System maintenance
 
-> For thinkpads only: `sudo aptitude install tp-smapi-dkms acpi-call-dkms`
+System changes are opt-in:
 
-### Hardware sensors
+```sh
+./system-setup --upgrades full --dry-run
+./system-setup --keyd on --dry-run
+./system-setup --backups on --dry-run
+```
 
-* lm-sensors
-* hddtemp
-* psensor
-* i7z
-* cpupower
+On Tumbleweed, full updates use `zypper dup`. Backup setup uses Restic and needs credentials configured under `/etc/dotfiles-private/`. Keyboard remapping is in `system/keyd/default.conf`.
 
-`sudo aptitude install lm-sensors hddtemp psensor`
+## Validation
 
-### Network
+GitHub Actions checks shell syntax, ShellCheck, Lua files, i3 configuration and apply/revert round trips on Debian and openSUSE. Run `tests/roundtrip.sh` under Dash to test Stow locally.
 
-Proper network manager with VPN support
-
-* curl
-* network-manager
-* network-manager-gnome
-* network-manager-openvpn
-* network-manager-vpnc
-* network-manager-vpnc-gnome
-* network-manager-pptp
-* network-manager-pptp-gnome
-* network-manager-openvpn
-* network-manager-openvpn-gnome
-* pptpd
-* ppp
-* pptp-linux
-
-`sudo aptitude install curl network-manager network-manager-gnome network-manager-openvpn network-manager-vpnc network-manager-vpnc-gnome network-manager-pptp network-manager-pptp-gnome network-manager-openvpn network-manager-openvpn-gnome pptpd ppp pptp-linux`
-
-### Storage
-
-* gnome-disk-utility
-* gparted
-
-`sudo aptitude install gnome-disk-utility gparted`
-
-## Shell
-
-* `sudo aptitude install kitty ripgrep zsh shellcheck fzf silversearcher-ag bat`
-* `stow kitty shell tmux`
-
-* `chsh -s $(which zsh)`
-* `sudo update-alternatives --config x-terminal-emulator`
-
-## Appearance
-
-### Utilities
-
-* lxappearance
-* xsettingsd
-* nitrogen
-
-### Theme
-
-* numix-gtk-theme
-* numix-icon-theme
-
-
-`sudo aptitude install numix-gtk-theme numix-icon-theme`
-
-### Fonts
-
-* ttf-mscorefonts-installer
-* ttf-dejavu
-* fonts-hack-ttf
-* fonts-font-awesome
-* fonts-open-sans
-* fonts-paratype
-* fonts-noto
-
-`sudo aptitude install ttf-mscorefonts-installer ttf-dejavu fonts-hack-ttf fonts-font-awesome fonts-open-sans fonts-paratype fonts-noto`
-
-#### Install Microsoft Tahoma, Segoe UI, and other fonts
-
-    mkdir ~/.fonts
-    wget -qO- http://plasmasturm.org/code/vistafonts-installer/vistafonts-installer | bash
-
-### i3
-
-* [i3](https://blog.diogo.site/posts/i3wm)
-* suckless-tools
-* i3blocks
-* [XBright](https://github.com/snobb/xbright)
-* [morc_menu](https://github.com/Boruch-Baum/morc_menu)
-* ranger
-* light-locker
-* dconf-editor
-* xdotool
-
-* `sudo aptitude install i3 j4-dmenu-desktop suckless-tools i3blocks ranger nitrogen light-locker xdotool`
-
-#### Notifications
-
-* xfce4-notifyd
-
-`sudo aptitude install xfce4-notifyd`
-
-## System
-
-### Power Manager
-
-* xfce4-power-manager
-
-`sudo aptitude install xfce4-power-manager`
-
-### SECURITY (FIREWALL AND ANTI-VIRUS)
-
-    sudo aptitude install ufw gufw clamav clamtk
-    sudo ufw default deny
-    sudo ufw enable
-
-### Updates notifier
-
-* pk-update-icon
-* apt-config-auto-update
-
-`sudo aptitude install pk-update-icon apt-config-auto-update`
-
-
-## General Software
-
-### Multimedia
-
-* pavucontrol
-* libavcodec-extra
-* clementine
-* gimp
-* totem
-* handbrake
-* audacity
-* krita
-* blender
-* freecad
-* openscad
-
-`sudo aptitude install pavucontrol libavcodec-extra clementine gimp totem handbrake audacity`
-
-### Utilities
-
-* tmux
-* parcellite
-* qalculate-gtk
-* gparted
-* simplescreenrecorder
-* kde-spectacle
-* gthumb
-* feh
-* engrampa
-* arandr
-* redshift-gtk
-* seahorse
-
-`sudo aptitude install tmux parcellite qalculate-gtk gthumb engrampa arandr seahorse`
-
-### Programming
-
-* geany with [Darcula colorscheme](https://raw.githubusercontent.com/codebrainz/geany-themes/master/colorschemes/darcula.conf)
-* kate
-* git
-
-`sudo aptitude install git geany kate`
-
-#### Neovim
-
-* `sudo aptitude purge vim-tiny`
-* `sudo aptitude install neovim`
-* `stow neovim tags-settings python javascript ruby`
-
-### Internet
-
-* `sudo aptitude install qbittorrent`
-
-#### Chatting
-
-* [hexchat](https://hexchat.readthedocs.io/en/latest/building.html#unix) (with [Monokai](https://hexchat.github.io/themes.html) theme)
-* `sudo aptitude install pidgin`
-
-#### KDE CONNECT
-
-    sudo aptitude install kdeconnect
-    sudo ufw allow 1714:1764/udp
-    sudo ufw allow 1714:1764/tcp
-    sudo ufw reload
-
-### Math
-
-* bc
-* SageMath
-* GNUPlot
-* jupyter-notebook
-
-`sudo aptitude install bc sagemath gnuplot python3-dev python3-pip jupyter-notebook`
-
-### Office
-
-* atril
-* libreoffice
-
-`sudo aptitude install atril libreoffice zathura`
+License: MIT.

@@ -1,0 +1,167 @@
+#!/bin/dash
+set -eu
+
+ROOT=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+PRIVATE_DIR=$ROOT/private
+HOST=$(hostname -s 2>/dev/null || hostname)
+AGENT=auto
+INSTALL_SYSTEM=0
+DRY_RUN=0
+
+usage() {
+    cat <<'USAGE'
+Usage: ./private-apply [options]
+
+Options:
+  --host NAME          select private/hosts/NAME (default: short hostname)
+  --agent MODE         auto, bitwarden, desktop, openssh, gpg, or none (default: auto)
+  --system             also install the root overlay below /
+  --dry-run            show operations without copying/importing anything
+  -h, --help           show this help
+USAGE
+}
+say() { printf '%s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+as_root() {
+    if [ "$(id -u)" -eq 0 ]; then "$@"; elif have sudo; then sudo "$@"; else die 'sudo is required for --system'; fi
+}
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --host) [ "$#" -ge 2 ] || die '--host needs a value'; HOST=$2; shift 2 ;;
+        --agent) [ "$#" -ge 2 ] || die '--agent needs a value'; AGENT=$2; shift 2 ;;
+        --system) INSTALL_SYSTEM=1; shift ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "unknown option: $1" ;;
+    esac
+done
+case $HOST in ''|*[!A-Za-z0-9._-]*) die 'invalid host name' ;; esac
+case $AGENT in auto|bitwarden|desktop|openssh|gpg|none) ;; *) die "invalid agent mode: $AGENT" ;; esac
+[ -d "$PRIVATE_DIR" ] || die 'private directory does not exist'
+
+copy_home_tree() {
+    cht_source=$1
+    [ -d "$cht_source" ] || return 0
+    find "$cht_source" -type f | while IFS= read -r cht_path; do
+        cht_rel=${cht_path#"$cht_source/"}
+        cht_dest=$HOME/$cht_rel
+        say "install home: ~/$cht_rel"
+        [ "$DRY_RUN" -eq 0 ] || continue
+        mkdir -p "$(dirname "$cht_dest")"
+        cp -p "$cht_path" "$cht_dest"
+    done
+}
+
+copy_system_tree() {
+    cst_source=$1
+    [ -d "$cst_source" ] || return 0
+    find "$cst_source" -type f | while IFS= read -r cst_path; do
+        cst_rel=${cst_path#"$cst_source/"}
+        case $cst_rel in
+            etc/dotfiles-private/*|etc/ssh/ssh_config.d/*) ;;
+            *) die "system private path is outside the allow-list: $cst_rel" ;;
+        esac
+        say "install system: /$cst_rel"
+        [ "$DRY_RUN" -eq 0 ] || continue
+        case $cst_rel in
+            etc/ssh/ssh_config.d/*)
+                as_root install -d -m 0755 "$(dirname "/$cst_rel")"
+                as_root install -m 0644 "$cst_path" "/$cst_rel"
+                ;;
+            *)
+                as_root install -d -m 0700 "$(dirname "/$cst_rel")"
+                as_root install -m 0600 "$cst_path" "/$cst_rel"
+                ;;
+        esac
+    done
+}
+
+import_gnupg() {
+    ig_dir=$1
+    [ -d "$ig_dir" ] || return 0
+    have gpg || die 'gpg is required to import OpenPGP material'
+    find "$ig_dir/import" -type f -name '*.asc' 2>/dev/null | while IFS= read -r ig_key; do
+        say "import GPG: ${ig_key#"$PRIVATE_DIR/"}"
+        [ "$DRY_RUN" -eq 0 ] || continue
+        gpg --batch --import "$ig_key"
+    done
+    if [ -f "$ig_dir/ownertrust.txt" ]; then
+        say "import GPG ownertrust: ${ig_dir#"$PRIVATE_DIR/"}/ownertrust.txt"
+        if [ "$DRY_RUN" -eq 0 ]; then gpg --batch --import-ownertrust "$ig_dir/ownertrust.txt"; fi
+    fi
+}
+
+secure_private_modes() {
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    if [ -d "$HOME/.ssh" ]; then
+        chmod 0700 "$HOME/.ssh"
+        find "$HOME/.ssh" -type f -exec chmod 0600 {} +
+        find "$HOME/.ssh" -type f \( -name '*.pub' -o -name known_hosts \) -exec chmod 0644 {} +
+    fi
+    if [ -d "$HOME/.gnupg" ]; then
+        chmod 0700 "$HOME/.gnupg"
+        find "$HOME/.gnupg" -type f -exec chmod 0600 {} +
+    fi
+}
+
+agent_state_file=${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/ssh-agent
+configure_agent() {
+    ca_mode=$1
+    if [ "$ca_mode" = auto ]; then
+        case ${XDG_CURRENT_DESKTOP:-}:${DESKTOP_SESSION:-} in
+            *KDE*|*GNOME*|*Plasma*|*xfce*) ca_mode=desktop ;;
+            *) ca_mode=openssh ;;
+        esac
+    fi
+    say "SSH agent mode: $ca_mode"
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    mkdir -p "$(dirname "$agent_state_file")"
+    case $ca_mode in
+        desktop)
+            rm -f "$agent_state_file"
+            if have systemctl; then systemctl --user disable --now dotfiles-ssh-agent.socket >/dev/null 2>&1 || true; fi
+            ;;
+        bitwarden)
+            printf 'bitwarden\n' > "$agent_state_file"
+            if have systemctl; then systemctl --user disable --now dotfiles-ssh-agent.socket >/dev/null 2>&1 || true; fi
+            ;;
+        openssh)
+            have ssh-agent || die 'ssh-agent is not installed; add the OpenSSH client package for this host'
+            [ -f "$HOME/.config/systemd/user/dotfiles-ssh-agent.socket" ] || die 'dotfiles SSH-agent systemd unit is not installed; apply a Stow profile first'
+            printf 'openssh\n' > "$agent_state_file"
+            if have systemctl; then
+                systemctl --user daemon-reload
+                systemctl --user enable --now dotfiles-ssh-agent.socket
+            else
+                warn 'systemd user services unavailable; start ssh-agent manually'
+            fi
+            ;;
+        gpg)
+            have gpgconf || die 'gpgconf is required for gpg-agent SSH support'
+            mkdir -p "$HOME/.gnupg"
+            chmod 0700 "$HOME/.gnupg"
+            grep -F -x 'enable-ssh-support' "$HOME/.gnupg/gpg-agent.conf" >/dev/null 2>&1 || printf '\nenable-ssh-support\n' >> "$HOME/.gnupg/gpg-agent.conf"
+            printf 'gpg\n' > "$agent_state_file"
+            gpgconf --kill gpg-agent || true
+            gpgconf --launch gpg-agent
+            ;;
+        none)
+            printf 'none\n' > "$agent_state_file"
+            if have systemctl; then systemctl --user disable --now dotfiles-ssh-agent.socket >/dev/null 2>&1 || true; fi
+            ;;
+    esac
+}
+
+copy_home_tree "$PRIVATE_DIR/common/home"
+copy_home_tree "$PRIVATE_DIR/hosts/$HOST/home"
+import_gnupg "$PRIVATE_DIR/common/gnupg"
+import_gnupg "$PRIVATE_DIR/hosts/$HOST/gnupg"
+if [ "$INSTALL_SYSTEM" -eq 1 ]; then
+    copy_system_tree "$PRIVATE_DIR/common/system"
+    copy_system_tree "$PRIVATE_DIR/hosts/$HOST/system"
+fi
+secure_private_modes
+configure_agent "$AGENT"
+say 'Private overlay applied.'

@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule monthly Restic repository checks
+
+[Timer]
+OnCalendar=monthly
+RandomizedDelaySec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

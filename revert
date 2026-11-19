@@ -1,0 +1,100 @@
+#!/bin/dash
+# Intentional word splitting is used only for the validated manifest package list.
+# shellcheck disable=SC2086
+set -eu
+
+ROOT=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+PACKAGES_DIR=$ROOT/packages
+DRY_RUN=0
+
+usage() {
+    cat <<'USAGE'
+Usage: ./revert [--dry-run]
+
+Removes links created by ./apply and restores files backed up by it.
+USAGE
+}
+say() { printf '%s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "unknown option: $1" ;;
+    esac
+done
+
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+STATE_DIR=$STATE_HOME/dotfiles
+MANIFEST=$STATE_DIR/manifest
+BACKUP_LIST=$STATE_DIR/backups.list
+[ -f "$MANIFEST" ] || die 'no active dotfiles manifest was found'
+command -v stow >/dev/null 2>&1 || die 'GNU Stow is required to revert'
+command -v find >/dev/null 2>&1 || die 'findutils is required to revert'
+
+PACKAGES=$(sed -n 's/^package=//p' "$MANIFEST")
+RESTORE_FAILED=0
+BACKUP_DIR=$(sed -n 's/^backup_dir=//p' "$MANIFEST" | sed -n '1p')
+[ -n "$PACKAGES" ] || die 'manifest contains no packages'
+case $BACKUP_DIR in
+    "$STATE_DIR"/backups/*) ;;
+    *) die 'manifest contains an invalid backup directory' ;;
+esac
+for manifest_package in $PACKAGES; do
+    case $manifest_package in
+        ''|*[!A-Za-z0-9._-]*) die 'manifest contains an invalid package name' ;;
+    esac
+    [ -d "$PACKAGES_DIR/$manifest_package" ] || die "manifest package is missing: $manifest_package"
+done
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    stow --dir="$PACKAGES_DIR" --target="$HOME" --no-folding --delete --simulate --verbose=2 $PACKAGES
+else
+    stow --dir="$PACKAGES_DIR" --target="$HOME" --no-folding --delete $PACKAGES
+fi
+
+restore_one() {
+    ro_rel=$1
+    case $ro_rel in
+        ''|/*|../*|*/../*|*/..)
+            warn "invalid backup path in state: $ro_rel"
+            RESTORE_FAILED=1
+            return 0
+            ;;
+    esac
+    ro_source=$BACKUP_DIR/$ro_rel
+    ro_destination=$HOME/$ro_rel
+    [ -e "$ro_source" ] || [ -L "$ro_source" ] || return 0
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "would restore: ~/$ro_rel"
+        return 0
+    fi
+    if [ -d "$ro_destination" ] && [ ! -L "$ro_destination" ]; then
+        find "$ro_destination" -depth -type d -exec rmdir {} \; 2>/dev/null || true
+    fi
+    if [ -e "$ro_destination" ] || [ -L "$ro_destination" ]; then
+        warn "not restoring ~/$ro_rel because a new path exists there"
+        RESTORE_FAILED=1
+        return 0
+    fi
+    mkdir -p "$(dirname "$ro_destination")"
+    mv "$ro_source" "$ro_destination"
+    say "restored: ~/$ro_rel"
+}
+
+if [ -f "$BACKUP_LIST" ]; then
+    REVERSED=${TMPDIR:-/tmp}/dotfiles-backups-reverse.$$
+    trap 'rm -f "$REVERSED"' EXIT HUP INT TERM
+    awk '{ line[NR]=$0 } END { for (i=NR; i>=1; i--) print line[i] }' "$BACKUP_LIST" > "$REVERSED"
+    while IFS= read -r rel; do
+        [ -n "$rel" ] && restore_one "$rel"
+    done < "$REVERSED"
+    rm -f "$REVERSED"
+    trap - EXIT HUP INT TERM
+fi
+[ "$RESTORE_FAILED" -eq 0 ] || die 'some backups could not be restored; state was retained so revert can be retried'
+if [ "$DRY_RUN" -eq 0 ]; then
+    rm -f "$MANIFEST" "$BACKUP_LIST"
+fi
+say 'Dotfiles reverted.'

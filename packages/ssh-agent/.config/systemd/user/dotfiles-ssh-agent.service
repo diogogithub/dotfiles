@@ -1,0 +1,8 @@
+[Unit]
+Description=Personal OpenSSH authentication agent
+Requires=dotfiles-ssh-agent.socket
+After=dotfiles-ssh-agent.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env ssh-agent -D -a %t/dotfiles-ssh-agent.socket

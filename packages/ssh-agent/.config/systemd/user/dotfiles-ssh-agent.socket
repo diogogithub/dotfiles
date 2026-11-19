@@ -1,0 +1,9 @@
+[Unit]
+Description=Personal OpenSSH authentication agent socket
+
+[Socket]
+ListenStream=%t/dotfiles-ssh-agent.socket
+SocketMode=0600
+
+[Install]
+WantedBy=sockets.target

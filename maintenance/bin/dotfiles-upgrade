@@ -1,0 +1,36 @@
+#!/bin/dash
+set -eu
+
+CONFIG=/etc/dotfiles-maintenance.conf
+[ -r "$CONFIG" ] || { printf 'missing %s\n' "$CONFIG" >&2; exit 1; }
+# shellcheck disable=SC1090
+. "$CONFIG"
+
+OS_ID=unknown
+if [ -r /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    OS_ID=${ID:-unknown}
+fi
+
+case $OS_ID in
+    opensuse-tumbleweed)
+        [ "${UPGRADE_POLICY:-}" = full ] || { printf 'Tumbleweed requires UPGRADE_POLICY=full\n' >&2; exit 1; }
+        exec zypper --non-interactive dist-upgrade
+        ;;
+    opensuse-leap|sles)
+        case ${UPGRADE_POLICY:-security} in
+            security)
+                exec zypper --non-interactive --non-interactive-include-reboot-patches patch --category security
+                ;;
+            full)
+                exec zypper --non-interactive update
+                ;;
+            *) printf 'invalid UPGRADE_POLICY\n' >&2; exit 1 ;;
+        esac
+        ;;
+    *)
+        printf 'dotfiles-upgrade is only used on openSUSE; Debian uses unattended-upgrades\n' >&2
+        exit 1
+        ;;
+esac

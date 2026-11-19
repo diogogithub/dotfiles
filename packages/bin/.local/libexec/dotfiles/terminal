@@ -1,0 +1,6 @@
+#!/bin/dash
+for terminal in kitty konsole xfce4-terminal foot alacritty xterm; do
+    if command -v "$terminal" >/dev/null 2>&1; then exec "$terminal" "$@"; fi
+done
+printf 'No supported terminal emulator found.\n' >&2
+exit 1

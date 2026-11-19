@@ -1,0 +1,18 @@
+#!/bin/dash
+set -eu
+umask 077
+ENV_FILE=/etc/dotfiles-private/restic.env
+[ -r "$ENV_FILE" ] || { printf 'missing %s\n' "$ENV_FILE" >&2; exit 1; }
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+: "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY is required}"
+restore_path=${RESTIC_RESTORE_TEST_PATH:-/etc/hostname}
+case $restore_path in /*) ;; *) printf 'RESTIC_RESTORE_TEST_PATH must be absolute\n' >&2; exit 1 ;; esac
+restic check
+restore_dir=$(mktemp -d /var/tmp/dotfiles-restic-restore.XXXXXX)
+trap 'rm -rf "$restore_dir"' EXIT HUP INT TERM
+restic restore latest --target "$restore_dir" --include "$restore_path"
+[ -e "$restore_dir$restore_path" ] || { printf 'restore test did not produce %s\n' "$restore_path" >&2; exit 1; }
+printf 'Restic metadata and restore test passed for %s\n' "$restore_path"

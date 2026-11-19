@@ -1,0 +1,40 @@
+#!/bin/dash
+set -eu
+case ${1:-} in
+    volume)
+        if command -v wpctl >/dev/null 2>&1; then
+            wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null |
+                awk '{printf "♪ %d%%%s\n", ($2 * 100) + 0.5, /MUTED/ ? " [muted]" : ""}' || :
+        elif command -v pactl >/dev/null 2>&1; then
+            pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null |
+                awk 'NR == 1 { for (i=1; i<=NF; i++) if ($i ~ /^[0-9]+%$/) {print "♪ " $i; exit} }' || :
+        fi
+        ;;
+    memory)
+        free -m | awk '/^Mem:/ {printf " %d/%d MiB\n", $3, $2}'
+        ;;
+    disk)
+        df -h "$HOME" | awk 'NR == 2 {printf " %s/%s\n", $3, $2}'
+        ;;
+    load)
+        awk '{printf " %s\n", $1}' /proc/loadavg
+        ;;
+    battery)
+        for battery in /sys/class/power_supply/BAT*; do
+            [ -r "$battery/capacity" ] || continue
+            percentage=$(cat "$battery/capacity")
+            printf ' %s%%\n' "$percentage"
+            break
+        done
+        ;;
+    network)
+        if command -v ip >/dev/null 2>&1; then
+            link=$(ip -o route show default 2>/dev/null | awk 'NR == 1 {for(i=1;i<=NF;i++)if($i=="dev"){print $(i+1);exit}}')
+            [ -z "$link" ] || printf ' %s\n' "$link"
+        fi
+        ;;
+    time)
+        date '+ %a %d/%m %H:%M:%S'
+        ;;
+    *) exit 2 ;;
+esac

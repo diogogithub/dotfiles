@@ -1,0 +1,9 @@
+dash
+findutils
+git
+stow
+zsh
+neovim
+curl
+
+openssh-client

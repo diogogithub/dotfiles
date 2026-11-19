@@ -1,0 +1,27 @@
+#!/bin/dash
+set -eu
+action=${1:-}
+case $action in lock|logout|suspend|reboot|poweroff) ;; *) exit 2 ;; esac
+if [ "$action" = lock ]; then exec "$HOME/.local/libexec/dotfiles/lock"; fi
+
+if command -v rofi >/dev/null 2>&1; then
+    answer=$(printf 'no\nyes\n' | rofi -dmenu -i -p "Confirm $action?" || :)
+elif command -v dmenu >/dev/null 2>&1; then
+    answer=$(printf 'no\nyes\n' | dmenu -i -p "Confirm $action?" || :)
+else
+    printf 'Type yes to %s: ' "$action" >&2
+    IFS= read -r answer || :
+fi
+[ "$answer" = yes ] || exit 0
+case $action in
+    logout)
+        if pgrep -u "$(id -u)" -x xfce4-session >/dev/null 2>&1 &&
+           command -v xfce4-session-logout >/dev/null 2>&1; then
+            exec xfce4-session-logout --logout
+        fi
+        exec i3-msg exit ;;
+    suspend)
+        "$HOME/.local/libexec/dotfiles/lock"
+        exec systemctl suspend ;;
+    reboot|poweroff) exec systemctl "$action" ;;
+esac

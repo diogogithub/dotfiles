@@ -1,0 +1,13 @@
+.DS_Store
+.directory
+*~
+*.swp
+*.swo
+*.un~
+.env
+.env.*
+!.env.example
+.direnv/
+.vscode/
+.idea/
+tags

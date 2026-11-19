@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+
+have() { command -v "$1" >/dev/null 2>&1; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+as_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif have sudo; then
+        sudo "$@"
+    else
+        die 'sudo is required to install Dash'
+    fi
+}
+
+if [ ! -x /bin/dash ]; then
+    OS_ID=unknown
+    OS_LIKE=
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        OS_ID=${ID:-unknown}
+        OS_LIKE=${ID_LIKE:-}
+    fi
+    case "$OS_ID:$OS_LIKE" in
+        debian:*|ubuntu:*|*:debian*)
+            as_root apt-get update
+            as_root apt-get install -y dash
+            ;;
+        opensuse-*:*|sles:*|*:suse*|*:opensuse*)
+            as_root zypper --non-interactive install dash
+            ;;
+        *)
+            die "Dash is not installed and OS '$OS_ID' is unsupported; install dash manually"
+            ;;
+    esac
+fi
+
+[ -x /bin/dash ] || die 'Dash was installed but /bin/dash is unavailable'
+exec /bin/dash "$ROOT/apply" "$@"

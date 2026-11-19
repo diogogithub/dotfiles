@@ -1,0 +1,18 @@
+#!/bin/dash
+# Launch the installed desktop app without an AppImage mount path.
+if command -v bitwarden >/dev/null 2>&1; then
+    exec bitwarden --autostart
+fi
+if [ -x /opt/Bitwarden/bitwarden ]; then
+    exec /opt/Bitwarden/bitwarden --autostart
+fi
+for appimage in "$HOME/Applications/Bitwarden.AppImage" "$HOME/.local/opt/Bitwarden.AppImage"; do
+    if [ -x "$appimage" ]; then
+        exec "$appimage" --autostart
+    fi
+done
+if command -v flatpak >/dev/null 2>&1 && flatpak info com.bitwarden.desktop >/dev/null 2>&1; then
+    exec flatpak run com.bitwarden.desktop
+fi
+printf 'Bitwarden not found. Install it or link the AppImage to ~/Applications/Bitwarden.AppImage\n' >&2
+exit 1

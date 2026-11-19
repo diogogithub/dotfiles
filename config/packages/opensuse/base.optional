@@ -1,0 +1,9 @@
+tmux
+ripgrep
+fzf
+jq
+direnv
+ShellCheck
+
+openssh-clients
+gpg2

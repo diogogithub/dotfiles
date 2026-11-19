@@ -1,0 +1,17 @@
+[Unit]
+Description=Check the Restic backup repository
+After=network-online.target
+Wants=network-online.target
+ConditionACPower=true
+ConditionPathExists=/etc/dotfiles-private/restic.env
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/dotfiles-backup-check
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+Environment=RESTIC_CACHE_DIR=/var/cache/restic
+CacheDirectory=restic

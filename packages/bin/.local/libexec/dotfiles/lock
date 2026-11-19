@@ -1,0 +1,8 @@
+#!/bin/dash
+if command -v xfce4-screensaver-command >/dev/null 2>&1 &&
+   pgrep -u "$(id -u)" -f '(^|/)xfce4-screensaver([[:space:]]|$)' >/dev/null 2>&1; then
+    xfce4-screensaver-command --lock >/dev/null 2>&1 && exit 0
+fi
+if command -v i3lock >/dev/null 2>&1; then exec i3lock -c 475263; fi
+printf 'No screen locker found.\n' >&2
+exit 1

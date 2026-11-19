@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply configured openSUSE automatic updates
+After=network-online.target
+Wants=network-online.target
+ConditionACPower=true
+ConditionPathExists=/etc/dotfiles-maintenance.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/dotfiles-upgrade
+Nice=10
+IOSchedulingClass=idle

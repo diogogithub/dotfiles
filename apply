@@ -1,0 +1,352 @@
+#!/bin/dash
+# Intentional word splitting is used only for validated package/Stow lists.
+# shellcheck disable=SC2086
+set -eu
+
+ROOT=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+PACKAGES_DIR=$ROOT/packages
+CONFIG_DIR=$ROOT/config
+PROFILE=common
+INSTALL=0
+SET_SHELL=0
+DRY_RUN=0
+LIST_PACKAGES=0
+
+usage() {
+    cat <<'USAGE'
+Usage: ./apply [options]
+
+Options:
+  --profile NAME   minimal, common, i3-xfce, or kde (default: common)
+  --install        install required and optional packages for the detected OS
+  --set-shell      change the login shell to zsh after a successful apply
+  --list-packages  print the resolved package lists and exit
+  --dry-run        show package, backup, and Stow actions without changing files
+  -h, --help       show this help
+
+On a fresh openSUSE installation run ./bootstrap instead; it installs Dash first.
+USAGE
+}
+
+say() { printf '%s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --profile)
+            [ "$#" -ge 2 ] || die '--profile needs a value'
+            PROFILE=$2
+            shift 2
+            ;;
+        --install) INSTALL=1; shift ;;
+        --set-shell) SET_SHELL=1; shift ;;
+        --list-packages) LIST_PACKAGES=1; shift ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) die "unknown option: $1" ;;
+    esac
+done
+
+PROFILE_FILE=$CONFIG_DIR/stow-profiles/$PROFILE
+[ -f "$PROFILE_FILE" ] || die "unsupported profile: $PROFILE"
+
+read_list() {
+    rl_file=$1
+    [ -f "$rl_file" ] || return 0
+    sed 's/[[:space:]]*#.*$//; /^[[:space:]]*$/d' "$rl_file"
+}
+
+join_list() {
+    jl_result=
+    while IFS= read -r jl_item; do
+        case $jl_item in
+            ''|*[!A-Za-z0-9+_.:@/-]*) die "invalid list entry in $1: $jl_item" ;;
+        esac
+        case " $jl_result " in
+            *" $jl_item "*) ;;
+            *) jl_result=${jl_result:+$jl_result }$jl_item ;;
+        esac
+    done
+    printf '%s\n' "$jl_result"
+}
+
+STOW_PACKAGES=$(read_list "$PROFILE_FILE" | join_list "$PROFILE_FILE")
+[ -n "$STOW_PACKAGES" ] || die "profile '$PROFILE' contains no Stow packages"
+for package in $STOW_PACKAGES; do
+    [ -d "$PACKAGES_DIR/$package" ] || die "missing package directory: packages/$package"
+done
+
+OS_ID=unknown
+OS_LIKE=
+DISTRO=
+load_os_release() {
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        OS_ID=${ID:-unknown}
+        OS_LIKE=${ID_LIKE:-}
+    fi
+    case "$OS_ID:$OS_LIKE" in
+        debian:*|ubuntu:*|*:debian*) DISTRO=debian ;;
+        opensuse-*:*|sles:*|*:suse*|*:opensuse*) DISTRO=opensuse ;;
+        *) DISTRO=unknown ;;
+    esac
+}
+
+resolve_package_files() {
+    rpf_dir=$CONFIG_DIR/packages/$DISTRO
+    REQUIRED_PACKAGES=$(read_list "$rpf_dir/base.required" | join_list "$rpf_dir/base.required")
+    {
+        read_list "$rpf_dir/base.optional"
+        case $PROFILE in
+            common|kde|i3-xfce) read_list "$rpf_dir/desktop.optional" ;;
+        esac
+        [ "$PROFILE" = i3-xfce ] && read_list "$rpf_dir/i3-xfce.optional"
+    } | join_list "$rpf_dir optional lists" > "${TMPDIR:-/tmp}/dotfiles-optional.$$"
+    OPTIONAL_PACKAGES=$(cat "${TMPDIR:-/tmp}/dotfiles-optional.$$")
+    rm -f "${TMPDIR:-/tmp}/dotfiles-optional.$$"
+}
+
+as_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif have sudo; then
+        sudo "$@"
+    else
+        die 'sudo is required to install packages'
+    fi
+}
+
+install_optional_debian() {
+    for pkg in $OPTIONAL_PACKAGES; do
+        if ! as_root apt-get install -y "$pkg"; then
+            warn "optional Debian package unavailable: $pkg"
+        fi
+    done
+}
+
+install_optional_opensuse() {
+    for pkg in $OPTIONAL_PACKAGES; do
+        if ! as_root zypper --non-interactive install "$pkg"; then
+            warn "optional openSUSE package unavailable: $pkg"
+        fi
+    done
+}
+
+install_packages() {
+    [ "$DISTRO" != unknown ] || die "unsupported package manager for OS '$OS_ID'"
+    say "Required packages ($DISTRO): $REQUIRED_PACKAGES"
+    [ -z "$OPTIONAL_PACKAGES" ] || say "Optional packages ($DISTRO): $OPTIONAL_PACKAGES"
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    case $DISTRO in
+        debian)
+            as_root apt-get update
+            as_root apt-get install -y $REQUIRED_PACKAGES
+            install_optional_debian
+            ;;
+        opensuse)
+            as_root zypper --non-interactive install $REQUIRED_PACKAGES
+            install_optional_opensuse
+            ;;
+    esac
+}
+
+load_os_release
+if [ "$DISTRO" != unknown ]; then
+    resolve_package_files
+else
+    REQUIRED_PACKAGES=
+    OPTIONAL_PACKAGES=
+fi
+
+if [ "$LIST_PACKAGES" -eq 1 ]; then
+    say "Stow packages: $STOW_PACKAGES"
+    if [ "$DISTRO" = unknown ]; then
+        say "OS '$OS_ID' is unsupported; package lists could not be resolved."
+    else
+        say "Required packages ($DISTRO): $REQUIRED_PACKAGES"
+        say "Optional packages ($DISTRO): $OPTIONAL_PACKAGES"
+    fi
+    exit 0
+fi
+
+[ "$INSTALL" -eq 0 ] || install_packages
+have stow || die 'GNU Stow is not installed (rerun through ./bootstrap --install or install it manually)'
+have find || die 'find is not installed (rerun through ./bootstrap --install or install findutils manually)'
+
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+STATE_DIR=$STATE_HOME/dotfiles
+MANIFEST=$STATE_DIR/manifest
+BACKUP_LIST=$STATE_DIR/backups.list
+
+if [ -f "$MANIFEST" ]; then
+    ACTIVE_PROFILE=$(sed -n 's/^profile=//p' "$MANIFEST" | sed -n '1p')
+    if [ -n "$ACTIVE_PROFILE" ] && [ "$ACTIVE_PROFILE" != "$PROFILE" ]; then
+        die "profile '$ACTIVE_PROFILE' is active; run './revert' before switching to '$PROFILE'"
+    fi
+    BACKUP_DIR=$(sed -n 's/^backup_dir=//p' "$MANIFEST" | sed -n '1p')
+else
+    STAMP=$(date '+%Y%m%d-%H%M%S')-$$
+    BACKUP_DIR=$STATE_DIR/backups/$STAMP
+fi
+case $BACKUP_DIR in
+    "$STATE_DIR"/backups/*) ;;
+    *) die 'invalid backup directory in dotfiles state' ;;
+esac
+
+canonical_path() {
+    readlink -f "$1" 2>/dev/null || printf '%s\n' "$1"
+}
+record_backup() {
+    rb_rel=$1
+    [ -f "$BACKUP_LIST" ] && grep -F -x "$rb_rel" "$BACKUP_LIST" >/dev/null 2>&1 && return 0
+    printf '%s\n' "$rb_rel" >> "$BACKUP_LIST"
+}
+backup_path() {
+    bp_rel=$1
+    bp_src=$HOME/$bp_rel
+    bp_dst=$BACKUP_DIR/$bp_rel
+    [ -e "$bp_src" ] || [ -L "$bp_src" ] || return 0
+    mkdir -p "$(dirname "$bp_dst")"
+    mv "$bp_src" "$bp_dst"
+    record_backup "$bp_rel"
+    say "backed up: ~/$bp_rel"
+}
+ensure_parent_path() {
+    ep_rel=$1
+    ep_parent=$(dirname "$ep_rel")
+    [ "$ep_parent" = . ] && return 0
+    ep_old_ifs=$IFS
+    IFS=/
+    # shellcheck disable=SC2086
+    set -- $ep_parent
+    IFS=$ep_old_ifs
+    ep_built=
+    for ep_component do
+        [ -n "$ep_component" ] || continue
+        ep_built=${ep_built:+$ep_built/}$ep_component
+        ep_current=$HOME/$ep_built
+        if [ -L "$ep_current" ] || { [ -e "$ep_current" ] && [ ! -d "$ep_current" ]; }; then
+            backup_path "$ep_built"
+            mkdir -p "$ep_current"
+        elif [ ! -d "$ep_current" ]; then
+            mkdir -p "$ep_current"
+        fi
+    done
+}
+prepare_conflicts() {
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    mkdir -p "$STATE_DIR" "$BACKUP_DIR"
+    [ -f "$BACKUP_LIST" ] || : > "$BACKUP_LIST"
+    for package in $STOW_PACKAGES; do
+        find "$PACKAGES_DIR/$package" \( -type f -o -type l \) -print | while IFS= read -r source_path; do
+            rel=${source_path#"$PACKAGES_DIR/$package/"}
+            ensure_parent_path "$rel"
+            destination=$HOME/$rel
+            if [ -L "$destination" ]; then
+                source_real=$(canonical_path "$source_path")
+                destination_real=$(canonical_path "$destination")
+                [ "$source_real" = "$destination_real" ] || backup_path "$rel"
+            elif [ -e "$destination" ]; then
+                backup_path "$rel"
+            fi
+        done
+    done
+}
+record_dry_backup() {
+    rdb_rel=$1
+    grep -F -x "$rdb_rel" "$DRY_REPORT" >/dev/null 2>&1 && return 0
+    printf '%s\n' "$rdb_rel" >> "$DRY_REPORT"
+    say "would back up: ~/$rdb_rel"
+}
+report_source_conflict() {
+    rsc_package=$1
+    rsc_rel=$2
+    rsc_parent=$(dirname "$rsc_rel")
+    rsc_blocked=0
+    if [ "$rsc_parent" != . ]; then
+        rsc_old_ifs=$IFS
+        IFS=/
+        # shellcheck disable=SC2086
+        set -- $rsc_parent
+        IFS=$rsc_old_ifs
+        rsc_built=
+        for rsc_component do
+            [ -n "$rsc_component" ] || continue
+            rsc_built=${rsc_built:+$rsc_built/}$rsc_component
+            rsc_current=$HOME/$rsc_built
+            if [ -L "$rsc_current" ] || { [ -e "$rsc_current" ] && [ ! -d "$rsc_current" ]; }; then
+                record_dry_backup "$rsc_built"
+                rsc_blocked=1
+                break
+            fi
+        done
+    fi
+    [ "$rsc_blocked" -eq 0 ] || return 0
+    rsc_destination=$HOME/$rsc_rel
+    if [ -L "$rsc_destination" ]; then
+        rsc_source_real=$(canonical_path "$PACKAGES_DIR/$rsc_package/$rsc_rel")
+        rsc_destination_real=$(canonical_path "$rsc_destination")
+        [ "$rsc_source_real" = "$rsc_destination_real" ] || record_dry_backup "$rsc_rel"
+    elif [ -e "$rsc_destination" ]; then
+        record_dry_backup "$rsc_rel"
+    fi
+}
+report_conflicts() {
+    for rsc_package in $STOW_PACKAGES; do
+        find "$PACKAGES_DIR/$rsc_package" \( -type f -o -type l \) -print | while IFS= read -r rsc_source; do
+            rsc_rel=${rsc_source#"$PACKAGES_DIR/$rsc_package/"}
+            report_source_conflict "$rsc_package" "$rsc_rel"
+        done
+    done
+}
+write_manifest() {
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    mkdir -p "$STATE_DIR"
+    {
+        printf 'profile=%s\n' "$PROFILE"
+        printf 'backup_dir=%s\n' "$BACKUP_DIR"
+        for package in $STOW_PACKAGES; do
+            printf 'package=%s\n' "$package"
+        done
+    } > "$MANIFEST.tmp"
+    mv "$MANIFEST.tmp" "$MANIFEST"
+}
+
+write_manifest
+prepare_conflicts
+if [ "$DRY_RUN" -eq 1 ]; then
+    DRY_ROOT=${TMPDIR:-/tmp}/dotfiles-dry-run.$$
+    DRY_TARGET=$DRY_ROOT/home
+    DRY_REPORT=$DRY_ROOT/backups.list
+    (umask 077 && mkdir -p "$DRY_TARGET") || die "could not create dry-run directory: $DRY_ROOT"
+    : > "$DRY_REPORT"
+    trap 'rm -rf "$DRY_ROOT"' EXIT HUP INT TERM
+    report_conflicts
+    stow --dir="$PACKAGES_DIR" --target="$DRY_TARGET" --no-folding --restow --simulate --verbose=2 $STOW_PACKAGES
+    rm -rf "$DRY_ROOT"
+    trap - EXIT HUP INT TERM
+else
+    if ! stow --dir="$PACKAGES_DIR" --target="$HOME" --no-folding --restow $STOW_PACKAGES; then
+        die "Stow failed after backups were created; recover with '$ROOT/revert'"
+    fi
+fi
+
+if [ "$SET_SHELL" -eq 1 ]; then
+    ZSH_PATH=$(command -v zsh || true)
+    [ -n "$ZSH_PATH" ] || die 'zsh is not installed'
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "would run: chsh -s $ZSH_PATH"
+    elif [ "${SHELL:-}" != "$ZSH_PATH" ]; then
+        chsh -s "$ZSH_PATH"
+    fi
+fi
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    say "Dry run complete for profile '$PROFILE'."
+else
+    say "Applied profile '$PROFILE'."
+    say "Revert with: $ROOT/revert"
+fi

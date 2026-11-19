@@ -1,0 +1,7 @@
+#!/bin/dash
+if command -v rofi >/dev/null 2>&1; then exec rofi -show drun -show-icons; fi
+if command -v xfce4-appfinder >/dev/null 2>&1; then exec xfce4-appfinder; fi
+if command -v krunner >/dev/null 2>&1; then exec krunner; fi
+if command -v dmenu_run >/dev/null 2>&1; then exec dmenu_run; fi
+printf 'No supported application launcher found.\n' >&2
+exit 1

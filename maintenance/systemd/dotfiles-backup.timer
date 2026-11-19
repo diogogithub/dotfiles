@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule encrypted Restic system backups
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=90m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

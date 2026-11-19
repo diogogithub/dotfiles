@@ -1,0 +1,42 @@
+[core]
+    editor = nvim
+    excludesFile = ~/.config/git/ignore
+[init]
+    defaultBranch = main
+[fetch]
+    prune = true
+    pruneTags = true
+[pull]
+    rebase = true
+[rebase]
+    autoSquash = true
+    autoStash = true
+[push]
+    default = simple
+    autoSetupRemote = true
+[diff]
+    algorithm = histogram
+    colorMoved = default
+[merge]
+    conflictStyle = zdiff3
+[rerere]
+    enabled = true
+    autoUpdate = true
+[branch]
+    sort = -committerdate
+[tag]
+    sort = version:refname
+[column]
+    ui = auto
+[help]
+    autocorrect = prompt
+[alias]
+    amend = commit --amend --no-edit
+    branches = branch --sort=-committerdate
+    graph = log --graph --decorate --oneline --all
+    last = log -1 --stat
+    root = rev-parse --show-toplevel
+    st = status --short --branch
+    unstage = restore --staged --
+[include]
+    path = ~/.config/git/local.conf
